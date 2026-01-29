@@ -160,4 +160,24 @@ class Easy : public Napi::ObjectWrap<Easy> {
   Easy& operator=(const Easy& that) = delete;
 };
 
+#include <unistd.h>
+
+inline ssize_t ReadFileWithOffset(int fd, void* buffer, size_t count, off_t offset) {
+#ifdef _WIN32
+  // Windows: use _lseek + _read
+  if (offset >= 0) {
+    if (_lseeki64(fd, offset, SEEK_SET) == -1) {
+      return -1;
+    }
+  }
+  return _read(fd, buffer, static_cast<unsigned int>(count));
+#else
+  // POSIX: use pread for atomic seek+read, or regular read
+  if (offset >= 0) {
+    return pread(fd, buffer, count, offset);
+  }
+  return read(fd, buffer, count);
+#endif
+}
+
 }  // namespace NodeLibcurl

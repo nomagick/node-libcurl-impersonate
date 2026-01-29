@@ -1664,23 +1664,8 @@ size_t Easy::ReadFunction(char* ptr, size_t size, size_t nmemb, void* userdata) 
       obj->readDataOffset += n;
     }
 
-    uv_fs_t readReq;
-
-    uv_loop_t* loop = nullptr;
-    auto napi_result = napi_get_uv_event_loop(obj->Env(), &loop);
-
-    if (napi_result != napi_ok) {
-      return CURL_READFUNC_ABORT;
-    }
-
-#if UV_VERSION_MAJOR < 1
-    returnValue = uv_fs_read(loop, &readReq, fd, ptr, n, offset, NULL);
-#else
-    uv_buf_t uvbuf = uv_buf_init(ptr, (unsigned int)(n));
-
-    returnValue = uv_fs_read(loop, &readReq, fd, &uvbuf, 1, offset, NULL);
-#endif
-    uv_fs_req_cleanup(&readReq);
+    ssize_t bytesRead = ReadFileWithOffset(fd, ptr, n, static_cast<off_t>(offset));
+    returnValue = static_cast<int32_t>(bytesRead);
   }
 
   if (returnValue < 0) {

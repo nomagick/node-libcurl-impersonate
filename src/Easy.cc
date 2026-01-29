@@ -20,6 +20,7 @@
 #include "Easy.h"
 #include "LocaleGuard.h"
 #include "Share.h"
+#include "ThreadUtils.h"
 #include "macros.h"
 
 #include <algorithm>
@@ -148,10 +149,11 @@ void Easy::Dispose() {
   this->ch = nullptr;
   this->isOpen = false;
 
-  const auto curl = this->Env().GetInstanceData<Curl>();
+  Napi::Env env = Napi::ObjectWrap<Easy>::Env();
+  const auto curl = env.GetInstanceData<Curl>();
   curl->AdjustHandleMemory(CURL_HANDLE_TYPE_EASY, -1);
 
-  if (this->isMonitoringSockets) {
+  if (this->isMonitoringSockets.load()) {
     this->UnmonitorSockets();
   }
 
@@ -220,7 +222,8 @@ void Easy::ResetRequiredHandleOptions(bool isFromDuplicate) {
   // This provides default CA certificates for SSL/TLS connections
   // Only available in libcurl >= 7.77.0
 #if NODE_LIBCURL_VER_GE(7, 77, 0)
-  const auto curl = this->Env().GetInstanceData<Curl>();
+  Napi::Env env = Napi::ObjectWrap<Easy>::Env();
+  const auto curl = env.GetInstanceData<Curl>();
   if (curl->caCertificatesBlob.data != nullptr && curl->caCertificatesBlob.len > 0) {
     curl_easy_setopt(this->ch, CURLOPT_CAINFO_BLOB, &curl->caCertificatesBlob);
   }
@@ -250,34 +253,56 @@ void Easy::CallSocketEvent(int status, int events) {
     return;
   }
 
-  const auto env = this->Env();
+  Napi::Env env = Napi::ObjectWrap<Easy>::Env();
   Napi::HandleScope scope(env);
 
   auto err = env.Null();
   if (status < 0) {
-    err = Napi::Error::New(env, UV_ERROR_STRING(status)).Value();
+    err = Napi::Error::New(env, GetErrorString(status)).Value();
   }
 
-  this->cbOnSocketEvent.MakeCallback(this->Value(), {err, Napi::Number::New(env, events)},
+  this->cbOnSocketEvent.MakeCallback(Napi::ObjectWrap<Easy>::Value(),
+                                     {err, Napi::Number::New(env, events)},
                                      *this->cbOnSocketEventAsyncContext);
 }
 
-void Easy::MonitorSockets() {
-  int retUv;
-  CURLcode retCurl;
-  int events = 0 | UV_READABLE | UV_WRITABLE;
+void Easy::SocketMonitorThreadFunc() {
+  while (!stopMonitoring_.load() && socketPoller_) {
+    PollResult result = socketPoller_->Poll(100);  // 100ms timeout
 
-  if (this->socketPollHandle) {
-    throw CurlError::New(this->Env(), "Already monitoring sockets!", CURLE_BAD_FUNCTION_ARGUMENT);
+    if (stopMonitoring_.load()) {
+      break;
+    }
+
+    if (result.status != 0 && socketEventTsfn_) {
+      int status = result.status;
+      int events = result.events;
+
+      socketEventTsfn_.NonBlockingCall([this, status, events](Napi::Env env, Napi::Function) {
+        if (env.IsExceptionPending()) return;
+        this->CallSocketEvent(status, events);
+      });
+    }
+  }
+}
+
+void Easy::MonitorSockets() {
+  Napi::Env env = Napi::ObjectWrap<Easy>::Env();
+
+  if (this->isMonitoringSockets.load()) {
+    throw CurlError::New(env, "Already monitoring sockets!", CURLE_BAD_FUNCTION_ARGUMENT);
   }
 
-  // TODO(jonathan, migration): drop if defs if we stop supporting old libcurl versions
+  CURLcode retCurl;
+  int events = POLL_EVENT_READABLE | POLL_EVENT_WRITABLE;
+
+  // Get the active socket
 #if NODE_LIBCURL_VER_GE(7, 45, 0)
   curl_socket_t socket;
   retCurl = curl_easy_getinfo(this->ch, CURLINFO_ACTIVESOCKET, &socket);
 
   if (socket == CURL_SOCKET_BAD) {
-    throw CurlError::New(this->Env(), "Received invalid socket from the current connection!",
+    throw CurlError::New(env, "Received invalid socket from the current connection!",
                          CURLE_BAD_FUNCTION_ARGUMENT);
   }
 #else
@@ -286,55 +311,57 @@ void Easy::MonitorSockets() {
 #endif
 
   if (retCurl != CURLE_OK) {
-    throw CurlError::New(this->Env(), "Failed to receive socket", retCurl, true);
+    throw CurlError::New(env, "Failed to receive socket", retCurl, true);
   }
 
-  this->socketPollHandle = new uv_poll_t;
-
-  uv_loop_t* loop = nullptr;
-  auto napi_result = napi_get_uv_event_loop(this->Env(), &loop);
-  assert(napi_result == napi_ok && "Failed to get UV event loop");
-
-  // uv_default_loop is not thread safe, but this will run on the same thread as the current Node.js
-  // environment.
-  retUv = uv_poll_init_socket(loop, this->socketPollHandle, socket);
-
-  if (retUv < 0) {
-    std::string errorMsg =
-        std::string("Failed to poll on connection socket. Reason: ") + UV_ERROR_STRING(retUv);
-
-    throw CurlError::New(this->Env(), errorMsg.c_str(), CURLE_INTERFACE_FAILED);
+  // Create the socket poller
+  socketPoller_ = std::make_unique<SocketPoller>();
+  if (!socketPoller_->Init(socket, events)) {
+    socketPoller_.reset();
+    throw CurlError::New(env, "Failed to initialize socket poller", CURLE_INTERFACE_FAILED);
   }
 
-  this->socketPollHandle->data = this;
+  // Create ThreadSafeFunction for socket event callbacks
+  socketEventTsfn_ = Napi::ThreadSafeFunction::New(env, Napi::Function(), "EasySocketEventCallback",
+                                                   0,   // Unlimited queue
+                                                   1);  // Initial thread count
 
-  retUv =
-      uv_poll_start(this->socketPollHandle, events, [](uv_poll_t* handle, int status, int events) {
-        const auto obj = static_cast<Easy*>(handle->data);
-        assert(obj);
-        obj->CallSocketEvent(status, events);
-      });
-  this->isMonitoringSockets = true;
+  // Start the monitoring thread
+  stopMonitoring_.store(false);
+  this->isMonitoringSockets.store(true);
+  socketMonitorThread_ = std::thread(&Easy::SocketMonitorThreadFunc, this);
 }
 
 void Easy::UnmonitorSockets() {
-  int retUv;
-  retUv = uv_poll_stop(this->socketPollHandle);
-
-  if (retUv < 0) {
-    std::string errorMsg =
-        std::string("Failed to stop polling on socket. Reason: ") + UV_ERROR_STRING(retUv);
-
-    throw CurlError::New(this->Env(), errorMsg.c_str(), CURLE_INTERFACE_FAILED);
+  if (!this->isMonitoringSockets.load()) {
+    return;
   }
 
-  uv_close(reinterpret_cast<uv_handle_t*>(this->socketPollHandle),
-           [](uv_handle_t* handle) { delete handle; });
-  this->isMonitoringSockets = false;
+  // Signal the thread to stop
+  stopMonitoring_.store(true);
+
+  // Wait for the thread to finish
+  if (socketMonitorThread_.joinable()) {
+    socketMonitorThread_.join();
+  }
+
+  // Clean up
+  if (socketPoller_) {
+    socketPoller_->Close();
+    socketPoller_.reset();
+  }
+
+  // Release the TSFN
+  if (socketEventTsfn_) {
+    socketEventTsfn_.Release();
+  }
+
+  this->isMonitoringSockets.store(false);
 }
 
 void inline Easy::throwErrorMultiInterfaceAware(const Napi::Error& error) noexcept {
-  Napi::HandleScope scope(this->Env());
+  Napi::Env env = Napi::ObjectWrap<Easy>::Env();
+  Napi::HandleScope scope(env);
 
   if (this->isInsideMultiHandle) {
     this->callbackError.Reset(error.Value());
@@ -389,7 +416,7 @@ Napi::Value Easy::GetterIsInsideMultiHandle(const Napi::CallbackInfo& info) {
 }
 
 Napi::Value Easy::GetterIsMonitoringSockets(const Napi::CallbackInfo& info) {
-  return Napi::Boolean::New(info.Env(), this->isMonitoringSockets);
+  return Napi::Boolean::New(info.Env(), this->isMonitoringSockets.load());
 }
 
 Napi::Value Easy::GetterIsOpen(const Napi::CallbackInfo& info) {
@@ -975,18 +1002,22 @@ Napi::Value Easy::GetInfoTmpl(const Easy* obj, int infoId) {
   CURLINFO info = static_cast<CURLINFO>(infoId);
   CURLcode code = curl_easy_getinfo(obj->ch, info, &result);
 
+  // Need non-const access to get Env() from ObjectWrap
+  Easy* nonConstObj = const_cast<Easy*>(obj);
+  Napi::Env env = nonConstObj->Napi::ObjectWrap<Easy>::Env();
+
   if (code != CURLE_OK) {
-    throw CurlError::New(obj->Env(), "Failed to get info", code, true);
+    throw CurlError::New(env, "Failed to get info", code, true);
   }
 
   // Handle string case - if result is char* and null, return empty string
   if constexpr (std::is_same_v<TResultType, char*>) {
     if (!result) {
-      return Napi::String::New(obj->Env(), "");
+      return Napi::String::New(env, "");
     }
-    return Napi::String::New(obj->Env(), result);
+    return Napi::String::New(env, result);
   } else {
-    return Napi::Number::New(obj->Env(), static_cast<double>(result));
+    return Napi::Number::New(env, static_cast<double>(result));
   }
 }
 
@@ -1453,9 +1484,6 @@ Napi::Value Easy::OnSocketEvent(const Napi::CallbackInfo& info) {
     throw Napi::TypeError::New(env, "Invalid callback given.");
   }
 
-  // If we were using Napi::TypedThreadSafeFunction<> here we would not need to keep track of
-  // context but that feels like a not needed complexity, as libuv will always be running on the
-  // same thread as the current Node.js environment.
   this->cbOnSocketEvent = Napi::Persistent(arg.As<Napi::Function>());
   this->cbOnSocketEventAsyncContext =
       std::make_shared<Napi::AsyncContext>(env, "Easy::OnSocketEvent");

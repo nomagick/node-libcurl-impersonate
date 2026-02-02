@@ -66,6 +66,12 @@ import { CurlReadFunc } from './enum/CurlReadFunc'
 import { CurlWsOptions } from './enum/CurlWs'
 import { CurlInfoNameSpecific, GetInfoReturn } from './Easy'
 import { CurlyMimePart } from './CurlyMimeTypes'
+import {
+  Browser,
+  getCurlOptionsFromBrowser,
+  getCurlOptionsFromBrowserConfig,
+  ImpersonateConfig,
+} from './impersonate'
 
 const bindings: typeof NodeLibcurlNativeBinding = require('../lib/binding/node_libcurl.node')
 
@@ -1126,6 +1132,21 @@ class Curl extends EventEmitter {
     this.emit('header', chunk, this)
 
     return size * nmemb
+  }
+
+  static impersonate(browserOrImpersonateConfig: Browser | ImpersonateConfig) {
+    let options: CurlOptionValueType
+    if (typeof browserOrImpersonateConfig === 'string') {
+      options = getCurlOptionsFromBrowser(browserOrImpersonateConfig)
+    } else {
+      options = getCurlOptionsFromBrowserConfig(browserOrImpersonateConfig)
+    }
+    const handle = new Curl()
+    for (const [option, value] of Object.entries(options)) {
+      // @ts-expect-error todo make type safe
+      handle.setOpt(option, value)
+    }
+    return handle
   }
 
   /**

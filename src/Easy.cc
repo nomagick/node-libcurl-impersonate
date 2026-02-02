@@ -1400,7 +1400,7 @@ Napi::Value Easy::WsStartFrame(const Napi::CallbackInfo& info) {
     throw CurlError::New(env, "Curl handle is closed.", CURLE_BAD_FUNCTION_ARGUMENT);
   }
 
-#if NODE_LIBCURL_VER_GE(7, 86, 0)
+#if NODE_LIBCURL_VER_GE(8, 16, 0)
   if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsNumber()) {
     throw CurlError::New(env, "Missing flags and/or frame length arguments.",
                          CURLE_BAD_FUNCTION_ARGUMENT);

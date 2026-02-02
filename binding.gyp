@@ -191,9 +191,11 @@
               ],
             }]
           ],
+          'defines': ['BUILD_IMPERSONATE'],
         }],
         ['OS=="mac"', {
           'cflags+': ['-fvisibility=hidden'],
+          'defines': ['BUILD_IMPERSONATE'],
           'configurations': {
             'Debug': {
               'xcode_settings': {

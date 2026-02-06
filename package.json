@@ -10,16 +10,16 @@
     "axios",
     "request"
   ],
-  "homepage": "https://github.com/JCMais/node-libcurl",
+  "homepage": "https://github.com/nomagick/node-libcurl-impersonate",
   "bugs": {
-    "url": "https://github.com/JCMais/node-libcurl/issues"
+    "url": "https://github.com/nomagick/node-libcurl-impersonate/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/JCMais/node-libcurl.git"
+    "url": "git://github.com/nomagick/node-libcurl-impersonate.git"
   },
   "license": "MIT",
-  "author": "Jonathan Cardoso <me@jonathancardoso.com>",
+  "author": "Yanlong Wang <yanlong.wang@naiver.org>",
   "type": "commonjs",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -36,8 +36,8 @@
     "module_name": "node_libcurl",
     "module_path": "./lib/binding/",
     "remote_path": "./v{version}/",
-    "package_name": "{module_name}-v{version}-{node_abi}-{platform}-{arch}-{libc}.tar.gz",
-    "host": "https://github.com/JCMais/node-libcurl/releases/download"
+    "package_name": "{module_name}-v{version}-napi-{platform}-{arch}-{libc}.tar.gz",
+    "host": "https://github.com/nomagick/node-libcurl-impersonate/releases/download"
   },
   "scripts": {
     "ae": "api-extractor run --local --verbose",
@@ -52,7 +52,7 @@
     "gen:constants": "node scripts/build-constants.js",
     "gen:docs": "typedoc",
     "preinstall": "node scripts/vcpkg-setup.js",
-    "install": "node-pre-gyp install --fallback-to-build",
+    "install": "scripts/install.sh",
     "postinstall": "node scripts/postinstall",
     "lint": "eslint lib/ scripts/ test/ examples/",
     "pregyp": "node-pre-gyp",

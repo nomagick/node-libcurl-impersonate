@@ -2,10 +2,10 @@
 set -euo pipefail
 cd "$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd -P)/.."
 
-CURL_IMPERSONATE_VERSION="1.4.2"
+CURL_IMPERSONATE_VERSION="1.4.3"
 
 # no action required if binding exists
-if [[ -f lib/binding/node_libcurl_ja3.node ]]; then
+if [[ -f lib/binding/node_libcurl.node ]]; then
   exit
 fi
 
@@ -40,7 +40,7 @@ build_from_source() {
 }
 
 if [[ "${npm_config_build_from_source:-}" == "true" ]] \
-    || ! npx node-pre-gyp install \
+    || ! npx node-pre-gyp install --fallback-to-build \
 ; then
   # fallback to build from source if node-pre-gyp install fails
   build_from_source

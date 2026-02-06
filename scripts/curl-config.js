@@ -10,6 +10,7 @@
 // but hey, there is no need for it to be more complex than this. :)
 
 const { exec } = require('child_process')
+const { resolve } = require('path')
 
 const { argv } = process
 
@@ -20,15 +21,18 @@ if (!argv[2]) {
 
 const arg = argv[2].trim()
 
-exec(`curl-config ${arg}`, function (error, stdout, stderr) {
-  if (error != null) {
-    console.error(
-      'Could not run curl-config, please make sure libcurl dev package is installed.',
-    )
-    console.error('Output: ' + stderr)
-    process.exit(1)
-  }
+exec(
+  `${resolve(__dirname, '../deps/curl-impersonate/build/curl-impersonate/bin/curl-impersonate-config')} ${arg}`,
+  function (error, stdout, stderr) {
+    if (error != null) {
+      console.error(
+        'Could not run curl-config, please make sure libcurl dev package is installed.',
+      )
+      console.error('Output: ' + stderr)
+      process.exit(1)
+    }
 
-  console.log(stdout)
-  process.exit(0)
-})
+    console.log(stdout)
+    process.exit(0)
+  },
+)

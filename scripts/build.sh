@@ -109,6 +109,15 @@ configure_build() {
     --without-libssh2
     --disable-sspi
     --disable-tls-srp
+    --disable-debug
+    --enable-optimize
+    --disable-warnings
+    --disable-curldebug
+    --disable-dependency-tracking
+    --without-nss
+    --without-libidn
+    --disable-manual
+    --disable-shared
   )
   cat "$CURL_IMPERSONATE_DIR/Makefile.in.bak" \
     | sed "s/-lc++/-l$CPP_LIB/" \

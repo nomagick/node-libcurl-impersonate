@@ -36,11 +36,11 @@ build_curl_impersonate() {
 build_from_source() {
   fetch_curl_impersonate_source
   build_curl_impersonate
-  npx node-pre-gyp rebuild
+  npx node-pre-gyp rebuild --build-from-source --curl_static_build=true
 }
 
 if [[ "${npm_config_build_from_source:-}" == "true" ]] \
-    || ! npx node-pre-gyp install --fallback-to-build \
+    || ! npx node-pre-gyp install --fallback-to-build --curl_static_build=true \
 ; then
   # fallback to build from source if node-pre-gyp install fails
   build_from_source

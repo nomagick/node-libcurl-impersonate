@@ -44,10 +44,6 @@ ZSTD_VERSION="1.5.7"
 ZSTD_SRC_DIR="$BUILD_DIR/zstd-$ZSTD_VERSION"
 ZSTD_OUT_DIR="$ZSTD_SRC_DIR/installed"
 
-LIBIDN2_VERSION="2.3.7"
-LIBIDN2_SRC_DIR="$BUILD_DIR/libidn2-$LIBIDN2_VERSION"
-LIBIDN2_OUT_DIR="$LIBIDN2_SRC_DIR/installed"
-
 # Determine OS-specific variables
 if [ "$OS" = "Linux" ]; then
   MAKE="make"
@@ -164,7 +160,6 @@ archive_build_sources() {
   untar "ngtcp2-$NGTCP2_VERSION.tar.bz2"
   untar "zlib-$ZLIB_VERSION.tar.gz"
   untar "zstd-$ZSTD_VERSION.tar.gz"
-  untar "libidn2-$LIBIDN2_VERSION.tar.gz"
   GZ_OPT=-9 tar zcf "$SRC_ARTIFACTS_FILE" -C "$tmpdir" curl-impersonate
   rm -rf "$tmpdir"
 }
@@ -178,7 +173,6 @@ archive_build_outputs() {
     "$(relpath "$BORINGSSL_SRC_DIR/include")" \
     "$(relpath "$BORINGSSL_SRC_DIR/lib")" \
     "$(relpath "$BROTLI_OUT_DIR/")" \
-    "$(relpath "$LIBIDN2_OUT_DIR/")" \
     "$(relpath "$CURL_OUT_DIR/")" \
     "$(relpath "$NGHTTP2_OUT_DIR/")" \
     "$(relpath "$NGHTTP3_OUT_DIR/")" \

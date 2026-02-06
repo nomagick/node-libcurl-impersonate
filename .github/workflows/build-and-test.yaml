@@ -164,22 +164,4 @@ jobs:
           path: build/${{ steps.prepare-env.outputs.binding_artifact }}.tar.gz
           if-no-files-found: error
 
-      - if: runner.os == 'Linux' && matrix.node == '24'
-        name: Create package tarball
-        run: |
-          npm pack
-          pkgver='${{ steps.prepare-env.outputs.pkgver }}'
-          tar xf "node-libcurl-ja3-$pkgver.tgz" -C build
-          rm -f "node-libcurl-ja3-$pkgver.tgz"
-          cd build
-          mv package node-libcurl-ja3
-          tar zcf '${{ steps.prepare-env.outputs.package_artifact }}.tar.gz' node-libcurl-ja3
-
-      - if: runner.os == 'Linux' && matrix.node == '24'
-        name: Upload package tarball
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.prepare-env.outputs.package_artifact }}.tar.gz
-          path: build/${{ steps.prepare-env.outputs.package_artifact }}.tar.gz
-          if-no-files-found: error
 

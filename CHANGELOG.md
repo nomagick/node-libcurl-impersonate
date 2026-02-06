@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 
+## [5.0.3] - 2026-02-06
+
+### Refactored
+- Forked and refactored to use latest node-libcurl napi bindings
+- Removed libuv dependency so this might work in more environments
+
 ## [5.0.2] - 2026-01-15
 
 ### Fixed

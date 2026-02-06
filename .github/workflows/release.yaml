@@ -60,7 +60,7 @@ jobs:
           # append commit to package.json version
           commit=$(git rev-parse HEAD)
           pkgver=$(sed -nE 's/.*"version": *"([^"]+)".*/\1/p' package.json)
-          pkgver="$pkgver-${commit:0:7}"
+          # pkgver="$pkgver-${commit:0:7}"
           sed -i.bak -E 's/(.*"version": *)"[^"]+"/\1"'"$pkgver"'"/' package.json
           rm -f package.json.bak
 

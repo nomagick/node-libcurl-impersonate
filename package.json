@@ -33,7 +33,7 @@
     "overlays"
   ],
   "binary": {
-    "module_name": "node_libcurl",
+    "module_name": "node_libcurl_impersonate",
     "module_path": "./lib/binding/",
     "remote_path": "./v{version}/",
     "package_name": "{module_name}-v{version}-napi-{platform}-{arch}-{libc}.tar.gz",

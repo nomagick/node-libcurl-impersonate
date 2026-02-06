@@ -44,6 +44,10 @@ ZSTD_VERSION="1.5.7"
 ZSTD_SRC_DIR="$BUILD_DIR/zstd-$ZSTD_VERSION"
 ZSTD_OUT_DIR="$ZSTD_SRC_DIR/installed"
 
+LIBIDN2_VERSION="2.3.7"
+LIBIDN2_SRC_DIR="$BUILD_DIR/libidn2-$LIBIDN2_VERSION"
+LIBIDN2_OUT_DIR="$LIBIDN2_SRC_DIR/installed"
+
 # Determine OS-specific variables
 if [ "$OS" = "Linux" ]; then
   MAKE="make"
@@ -99,7 +103,6 @@ configure_build() {
   local extra_config_flags
   declare -a extra_config_flags=(
     --without-gssapi
-    --without-libidn2
     --disable-ldap
     --disable-ldaps
     --without-libgsasl
@@ -115,7 +118,6 @@ configure_build() {
     --disable-curldebug
     --disable-dependency-tracking
     --without-nss
-    --without-libidn
     --disable-manual
     --disable-shared
   )
@@ -156,13 +158,13 @@ archive_build_sources() {
   git --work-tree="$tmpdir/curl-impersonate" checkout -fq HEAD
   unzip -q "boringssl-$BORINGSSL_COMMIT.zip" -d "$tmpdir/curl-impersonate/build"
   untar "brotli-$BROTLI_VERSION.tar.gz"
-  untar "c-ares-$CARES_VERSION.tar.gz"
   untar "curl-$CURL_VERSION.tar.gz"
   untar "nghttp2-$NGHTTP2_VERSION.tar.bz2"
   untar "nghttp3-$NGHTTP3_VERSION.tar.bz2"
   untar "ngtcp2-$NGTCP2_VERSION.tar.bz2"
   untar "zlib-$ZLIB_VERSION.tar.gz"
   untar "zstd-$ZSTD_VERSION.tar.gz"
+  untar "libidn2-$LIBIDN2_VERSION.tar.gz"
   GZ_OPT=-9 tar zcf "$SRC_ARTIFACTS_FILE" -C "$tmpdir" curl-impersonate
   rm -rf "$tmpdir"
 }
@@ -176,7 +178,7 @@ archive_build_outputs() {
     "$(relpath "$BORINGSSL_SRC_DIR/include")" \
     "$(relpath "$BORINGSSL_SRC_DIR/lib")" \
     "$(relpath "$BROTLI_OUT_DIR/")" \
-    "$(relpath "$CARES_OUT_DIR/")" \
+    "$(relpath "$LIBIDN2_OUT_DIR/")" \
     "$(relpath "$CURL_OUT_DIR/")" \
     "$(relpath "$NGHTTP2_OUT_DIR/")" \
     "$(relpath "$NGHTTP3_OUT_DIR/")" \

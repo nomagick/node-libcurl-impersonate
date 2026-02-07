@@ -118,6 +118,7 @@ void Multi::CleanupHookAsync(napi_async_cleanup_hook_handle handle, void* data) 
   // Stop the poller
   if (multi->poller_) {
     multi->poller_->Stop();
+    multi->poller_.reset();
   }
 
   // Mark timer as closed and unref
@@ -163,6 +164,11 @@ void Multi::Dispose() {
     CURLMcode code = curl_multi_cleanup(this->mh);
     assert(code == CURLM_OK);
     this->mh = nullptr;
+  }
+  if (!this->timerClosed) {
+    this->timerClosed = true;
+    napi_remove_async_cleanup_hook(this->removeHandle);
+    this->Unref();
   }
 
   curl->AdjustHandleMemory(CURL_HANDLE_TYPE_MULTI, -1);

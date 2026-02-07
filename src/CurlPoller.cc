@@ -29,6 +29,7 @@ CurlPoller::CurlPoller(Napi::Env env, SocketCallback onSocket, TimeoutCallback o
                         "CurlPollerCallback",
                         0,   // Unlimited queue
                         1);  // Initial thread count
+  tsfn_.Unref(env);
 }
 
 CurlPoller::~CurlPoller() {

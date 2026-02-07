@@ -51,7 +51,6 @@
     "gen:compile_commands": "node-pre-gyp configure -- -f compile_commands_json && cp ./build/Debug/compile_commands.json ./compile_commands.json",
     "gen:constants": "node scripts/build-constants.js",
     "gen:docs": "typedoc",
-    "preinstall": "node scripts/vcpkg-setup.js",
     "install": "scripts/install.sh",
     "postinstall": "node scripts/postinstall",
     "lint": "eslint lib/ scripts/ test/ examples/",

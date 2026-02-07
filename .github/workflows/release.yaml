@@ -157,7 +157,7 @@ jobs:
         run: rm -f build/${{ steps.prepare-env.outputs.curl_impersonate_artifact }}.tar.gz
 
       - name: Create native binding tarball
-        run: tar zcf build/${{ steps.prepare-env.outputs.binding_artifact }}.tar.gz -C lib/binding $(ls lib/binding)
+        run: tar zcf build/${{ steps.prepare-env.outputs.binding_artifact }}.tar.gz -C lib binding
 
       - name: Upload native binding tarball
         uses: actions/upload-artifact@v4

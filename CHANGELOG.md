@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 
+## [5.0.4] - 2026-05-14
+
+### Refactored
+- Bump libcurl-impersonate to latest
+
 ## [5.0.3] - 2026-02-06
 
 ### Refactored

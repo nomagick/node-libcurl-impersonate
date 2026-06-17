@@ -6,6 +6,7 @@
 #include "curl/multi.h"
 #include "macros.h"
 #include "napi.h"
+#include "uv.h"
 
 #include <cassert>
 
@@ -17,7 +18,6 @@
  */
 #include "Curl.h"
 #include "CurlError.h"
-#include "CurlPoller.h"
 #include "Easy.h"
 #include "Http2PushFrameHeaders.h"
 #include "LocaleGuard.h"
@@ -69,18 +69,13 @@ Multi::Multi(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Multi>(info), id
   curl_multi_setopt(this->mh, CURLMOPT_TIMERFUNCTION, Multi::HandleTimeout);
   curl_multi_setopt(this->mh, CURLMOPT_TIMERDATA, this);
 
-  // Create CurlPoller with callbacks
-  this->poller_ = std::make_unique<CurlPoller>(
-      env,
-      // Socket callback - called when socket has events
-      [this](curl_socket_t sockfd, int events) { this->OnSocketEvent(sockfd, events); },
-      // Timeout callback - called when timeout expires
-      [this]() { this->OnTimeoutEvent(); });
+  uv_loop_t* loop = nullptr;
+  auto napi_result = napi_get_uv_event_loop(env, &loop);
+  assert(napi_result == napi_ok && "Failed to get UV event loop");
 
-  // Start the polling thread
-  this->poller_->Start();
-
-  // We need to keep the reference alive for the duration of the poller
+  uv_timer_init(loop, &this->timeout);
+  this->timeout.data = this;
+  // We need to keep the reference alive for the duration of the timer.
   this->Ref();
 
   // Enable notification API if requested and supported
@@ -115,17 +110,30 @@ void Multi::CleanupHookAsync(napi_async_cleanup_hook_handle handle, void* data) 
   Multi* multi = static_cast<Multi*>(data);
   NODE_LIBCURL_DEBUG_LOG(multi, "Multi::CleanupHookAsync", "");
 
-  // Stop the poller
-  if (multi->poller_) {
-    multi->poller_->Stop();
-    multi->poller_.reset();
+  multi->CloseTimerAsync();
+}
+
+void Multi::CloseTimerAsync() {
+  if (this->timerClosed) {
+    return;
   }
 
-  // Mark timer as closed and unref
-  if (!multi->timerClosed) {
-    multi->timerClosed = true;
-    napi_remove_async_cleanup_hook(multi->removeHandle);
-    multi->Unref();
+  uv_handle_t* timeoutHandle = reinterpret_cast<uv_handle_t*>(&this->timeout);
+  if (!uv_is_closing(timeoutHandle)) {
+    NODE_LIBCURL_DEBUG_LOG(this, "Multi::CloseTimer", "closing timer handle");
+
+    // Stop the timer if it was started; safe to call even if it wasn't.
+    uv_timer_stop(&this->timeout);
+    uv_close(timeoutHandle, [](uv_handle_t* handle) {
+      uv_timer_t* timer = reinterpret_cast<uv_timer_t*>(handle);
+      Multi* multi = static_cast<Multi*>(timer->data);
+      napi_remove_async_cleanup_hook(multi->removeHandle);
+      NODE_LIBCURL_DEBUG_LOG(multi, "Multi::CloseTimerAsync", "removed async cleanup hook");
+      multi->Unref();
+    });
+    this->timerClosed = true;
+  } else {
+    NODE_LIBCURL_DEBUG_LOG(this, "Multi::CloseTimer", "timer handle is already closing");
   }
 }
 
@@ -144,11 +152,8 @@ void Multi::Dispose() {
 
   this->isOpen = false;
 
-  // Stop the poller
-  if (this->poller_) {
-    this->poller_->Stop();
-    this->poller_.reset();
-  }
+  // no point on running the timer anymore
+  uv_timer_stop(&this->timeout);
 
   auto curl = this->Env().GetInstanceData<Curl>();
 
@@ -156,29 +161,19 @@ void Multi::Dispose() {
   this->callbacks.clear();
   this->cbOnMessage.Reset();
 
-  // Clear Easy handle references
-  this->easyHandleRefs.clear();
-
   // Clean up multi handle
   if (this->mh) {
     CURLMcode code = curl_multi_cleanup(this->mh);
     assert(code == CURLM_OK);
     this->mh = nullptr;
   }
-  if (!this->timerClosed) {
-    this->timerClosed = true;
-    napi_remove_async_cleanup_hook(this->removeHandle);
-    this->Unref();
-  }
 
   curl->AdjustHandleMemory(CURL_HANDLE_TYPE_MULTI, -1);
 }
 
-void Multi::StopTimer() {
-  if (this->poller_) {
-    this->poller_->SetTimeout(-1);  // Disable timeout
-  }
-}
+// Debug logging methods removed - now using NODE_LIBCURL_DEBUG_LOG macros
+
+void Multi::StopTimer() { uv_timer_stop(&this->timeout); }
 
 // Initialize the class for export
 Napi::Function Multi::Init(Napi::Env env, Napi::Object exports) {
@@ -343,9 +338,6 @@ Napi::Value Multi::AddHandle(const Napi::CallbackInfo& info) {
   ++this->amountOfHandles;
   easy->isInsideMultiHandle = true;
 
-  // Store a reference to the Easy handle to prevent GC
-  this->easyHandleRefs[easy->ch] = Napi::Persistent(obj);
-
   return Napi::Number::New(env, static_cast<int>(code));
 }
 
@@ -384,9 +376,6 @@ Napi::Value Multi::RemoveHandle(const Napi::CallbackInfo& info) {
 
   --this->amountOfHandles;
   easy->isInsideMultiHandle = false;
-
-  // Remove the Easy handle reference (allows GC)
-  this->easyHandleRefs.erase(easy->ch);
 
   return Napi::Number::New(env, static_cast<int>(code));
 }
@@ -440,9 +429,6 @@ Napi::Value Multi::Perform(const Napi::CallbackInfo& info) {
 
   // Store the deferred promise for this handle
   this->handlePromiseMap[easy->ch] = std::make_shared<Napi::Promise::Deferred>(std::move(deferred));
-
-  // Store a reference to the Easy handle to prevent GC
-  this->easyHandleRefs[easy->ch] = Napi::Persistent(obj);
 
   // Return the promise
   return this->handlePromiseMap[easy->ch]->Promise();
@@ -588,17 +574,6 @@ void Multi::CallOnMessageCallback(CURL* easy, CURLcode handleCode) {
 
     // Clean up the promise reference
     this->handlePromiseMap.erase(promiseIt);
-
-    // Remove the Easy handle reference (allows GC)
-    this->easyHandleRefs.erase(easy);
-
-    // Mark handle as no longer in multi
-    easyObj->isInsideMultiHandle = false;
-    --this->amountOfHandles;
-
-    // Remove from multi handle
-    curl_multi_remove_handle(this->mh, easy);
-
     return;
   }
 
@@ -627,118 +602,150 @@ void Multi::CallOnMessageCallback(CURL* easy, CURLcode handleCode) {
   if (!this->isOpen) return;
 }
 
-// CurlPoller callback - socket event occurred (called on main thread via TSFN)
-void Multi::OnSocketEvent(curl_socket_t sockfd, int events) {
-  if (!this->isOpen) return;
+// Socket context management
+Multi::CurlSocketContext* Multi::CreateCurlSocketContext(curl_socket_t sockfd,
+                                                         Multi* multi) noexcept {
+  auto it = multi->socketContextMap.find(sockfd);
 
-  NODE_LIBCURL_DEBUG_LOG(
-      this, "Multi::OnSocketEvent",
-      "socket: " + std::to_string(sockfd) + " events: " + std::to_string(events));
-
-  int flags = 0;
-  if (events & POLL_EVENT_READABLE) flags |= CURL_CSELECT_IN;
-  if (events & POLL_EVENT_WRITABLE) flags |= CURL_CSELECT_OUT;
-
-  // Check comment on node_libcurl.cc
-  LocaleGuard localeGuard;
-
-  // Before version 7.20.0: If you receive CURLM_CALL_MULTI_PERFORM, this
-  // basically means that you should call curl_multi_socket_action again
-  // before you wait for more actions on libcurl's sockets.
-  CURLMcode code;
-  do {
-    code = curl_multi_socket_action(this->mh, sockfd, flags, &this->runningHandles);
-  } while (code == CURLM_CALL_MULTI_PERFORM);
-
-  assert(code == CURLM_OK && "curl_multi_socket_action failed");
-
-  // When notifications are enabled, libcurl will call our NotifyCallback when needed
-  if (!this->useNotificationsApi) {
-    this->ProcessMessages();
+  // calling uv_poll_init_socket multiple times for the same socket will return UV_EEXIST
+  // which would cause libcurl to be stuck. This happens because libcurl is calling the Socket
+  // callback with an empty socketp for an existing socket.
+  // This only happens with libcurl <= 7.81, but we are keeping it for all
+  // versions.
+  if (it != multi->socketContextMap.end()) {
+    NODE_LIBCURL_DEBUG_LOG(multi, "Multi::CreateCurlSocketContext",
+                           "Socket context already exists for socket: " + std::to_string(sockfd));
+    return it->second;
   }
+
+  CurlSocketContext* ctx = new (std::nothrow) CurlSocketContext();
+  // not enough memory to allocate the ctx
+  assert(ctx && "Multi::CreateCurlSocketContext - Failed to create socket context");
+
+  ctx->sockfd = sockfd;
+  ctx->multi = multi;
+
+  uv_loop_t* loop = nullptr;
+  auto napi_result = napi_get_uv_event_loop(multi->Env(), &loop);
+  assert(napi_result == napi_ok && "Multi::CreateCurlSocketContext - Failed to get UV event loop");
+
+  // uv_poll simply watches file descriptors using the operating system
+  // notification mechanism
+  //   whenever the OS notices a change of state in file descriptors being
+  //   polled, libuv will invoke the associated callback.
+  int result = uv_poll_init_socket(loop, &ctx->pollHandle, sockfd);
+  if (result != 0) {
+    auto errorMessage = "Multi::CreateCurlSocketContext Failed to initialize socket: " +
+                        std::string(uv_err_name(result));
+    std::cerr << errorMessage << std::endl;
+    // TODO(jonathan): this fails on libcurl <= 7.81, works on >= 7.82
+    // looks like there is a extra call to SocketFunction to delete a socket with socketp 0 on
+    // <=7.81
+    assert(false &&
+           "Multi::CreateCurlSocketContext - failed to initialize socket - See message above");
+  }
+
+  NODE_LIBCURL_DEBUG_LOG(multi, "Multi::CreateCurlSocketContext",
+                         "Initialized socket: " + std::to_string(sockfd));
+
+  ctx->pollHandle.data = ctx;
+  multi->socketContextMap[sockfd] = ctx;
+
+  return ctx;
 }
 
-// CurlPoller callback - timeout expired (called on main thread via TSFN)
-void Multi::OnTimeoutEvent() {
-  if (!this->isOpen) return;
+void Multi::DestroyCurlSocketContext(CurlSocketContext* ctx) {
+  auto handle = reinterpret_cast<uv_handle_t*>(&ctx->pollHandle);
 
-  NODE_LIBCURL_DEBUG_LOG(this, "Multi::OnTimeoutEvent", "");
+  auto it = ctx->multi->socketContextMap.find(ctx->sockfd);
+  if (it != ctx->multi->socketContextMap.end()) {
+    ctx->multi->socketContextMap.erase(it);
+  }
 
-  // Check comment on node_libcurl.cc
-  LocaleGuard localeGuard;
-  CURLMcode code =
-      curl_multi_socket_action(this->mh, CURL_SOCKET_TIMEOUT, 0, &this->runningHandles);
-
-  assert((CURLM_OK == code || true) &&
-         "Calling curl_multi_socket_action from within Multi::OnTimeoutEvent failed.");
-
-  // When notifications are enabled, libcurl will call our NotifyCallback when needed
-  if (!this->useNotificationsApi) {
-    this->ProcessMessages();
+  if (!uv_is_closing(handle)) {
+    uv_close(handle, [](uv_handle_t* handle) {
+      auto ctx = static_cast<CurlSocketContext*>(handle->data);
+      NODE_LIBCURL_DEBUG_LOG(ctx->multi, "Multi::DestroyCurlSocketContext",
+                             "Closed socket context for socket: " + std::to_string(ctx->sockfd));
+      delete ctx;
+    });
   }
 }
 
 // libcurl callback implementations
 int Multi::HandleSocket(CURL* easy, curl_socket_t s, int action, void* userp, void* socketp) {
+  CurlSocketContext* ctx = nullptr;
   Multi* obj = static_cast<Multi*>(userp);
-
-  NODE_LIBCURL_DEBUG_LOG(obj, "Multi::HandleSocket",
-                         "socket: " + std::to_string(s) + " action: " + std::to_string(action));
-
-  if (!obj->poller_) {
-    return -1;
-  }
 
   if (action == CURL_POLL_IN || action == CURL_POLL_OUT || action == CURL_POLL_INOUT ||
       action == CURL_POLL_NONE) {
-    // Convert action to poll events
-    int events = 0;
-    if (action != CURL_POLL_OUT) events |= POLL_EVENT_READABLE;
-    if (action != CURL_POLL_IN) events |= POLL_EVENT_WRITABLE;
-
+    // create ctx if it doesn't exists and assign it to the current socket,
     if (socketp) {
-      // Modify existing socket
-      obj->poller_->ModifySocket(s, events);
+      ctx = static_cast<Multi::CurlSocketContext*>(socketp);
     } else {
-      // Add new socket
-      obj->poller_->AddSocket(s, events);
-      curl_multi_assign(obj->mh, s, reinterpret_cast<void*>(1));  // Mark as registered
+      ctx = Multi::CreateCurlSocketContext(s, obj);
     }
 
-    return 0;
+    assert(ctx && "Multi::HandleSocket - Failed to create socket context");
+
+    curl_multi_assign(obj->mh, s, static_cast<void*>(ctx));
+
+    // set event based on the current action
+    int events = 0;
+
+    if (action != CURL_POLL_IN) events |= UV_WRITABLE;
+    if (action != CURL_POLL_OUT) events |= UV_READABLE;
+
+    NODE_LIBCURL_DEBUG_LOG(obj, "Multi::HandleSocket",
+                           "Starting poll for socket: " + std::to_string(s) +
+                               " with events: " + std::to_string(events));
+    return uv_poll_start(&ctx->pollHandle, events, Multi::OnSocket);
   }
 
   if (action == CURL_POLL_REMOVE) {
     if (socketp) {
-      obj->poller_->RemoveSocket(s);
+      ctx = static_cast<CurlSocketContext*>(socketp);
+
+      NODE_LIBCURL_DEBUG_LOG(obj, "Multi::HandleSocket",
+                             "Stopping poll for socket: " + std::to_string(s));
+
+      uv_poll_stop(&ctx->pollHandle);
+
+      Multi::DestroyCurlSocketContext(ctx);
       curl_multi_assign(obj->mh, s, nullptr);
     }
+
     return 0;
   }
 
   // see this: https://github.com/curl/curl/issues/14860#issuecomment-2452663239
   return -1;
 }
-
 // This function will be called when the timeout value changes from libcurl.
+// The timeout value is at what latest time the application should call one of
+// the "performing" functions of the multi interface (curl_multi_socket_action
+// and curl_multi_perform) - to allow libcurl to keep timeouts and retries etc
+// to work.
 int Multi::HandleTimeout(CURLM* multi,
                          long timeoutMs,  // NOLINT(runtime/int)
                          void* userp) {
   Multi* obj = static_cast<Multi*>(userp);
 
-  NODE_LIBCURL_DEBUG_LOG(obj, "Multi::HandleTimeout",
-                         "timeout: " + std::to_string(timeoutMs) + "ms");
-
-  if (obj->timerClosed || !obj->poller_) {
+  if (obj->timerClosed) {
     return 0;
   }
 
   if (timeoutMs < 0) {
-    obj->poller_->SetTimeout(-1);  // Disable timeout
-    return 0;
+    int uvStop = uv_timer_stop(&obj->timeout);
+    return uvStop;
   }
 
-  obj->poller_->SetTimeout(timeoutMs);
+  // we should not call libcurl functions directly from this callback
+  //  see https://github.com/curl/curl/issues/3537
+  if (timeoutMs >= 0) {
+    return uv_timer_start(&obj->timeout, Multi::OnTimeout, timeoutMs, 0);
+  }
+
   return 0;
 }
 
@@ -828,5 +835,59 @@ void Multi::NotifyCallback(CURLM* multi, unsigned int notification, CURL* easy, 
   }
 }
 #endif
+
+// function called when the previous timeout set reaches 0
+UV_TIMER_CB(Multi::OnTimeout) {
+  Multi* obj = static_cast<Multi*>(timer->data);
+
+  NODE_LIBCURL_DEBUG_LOG(obj, "Multi::OnTimeout", "");
+
+  // Check comment on node_libcurl.cc
+  LocaleGuard localeGuard;
+  CURLMcode code = curl_multi_socket_action(obj->mh, CURL_SOCKET_TIMEOUT, 0, &obj->runningHandles);
+
+  assert((CURLM_OK == code || true) &&
+         "Calling curl_multi_socket_action from within Multi::OnTimeout failed. This is possibly a "
+         "bug on node-libcurl or libcurl itself. Please report this issue to node-libcurl.");
+
+  // When notifications are enabled, libcurl will call our NotifyCallback when needed
+  if (!obj->useNotificationsApi) {
+    obj->ProcessMessages();
+  }
+}
+
+void Multi::OnSocket(uv_poll_t* handle, int status, int events) {
+  int flags = 0;
+
+  CURLMcode code;
+
+  if (status < 0) flags = CURL_CSELECT_ERR;
+  if (events & UV_READABLE) flags |= CURL_CSELECT_IN;
+  if (events & UV_WRITABLE) flags |= CURL_CSELECT_OUT;
+
+  Multi::CurlSocketContext* ctx = static_cast<Multi::CurlSocketContext*>(handle->data);
+
+  NODE_LIBCURL_DEBUG_LOG(ctx->multi, "Multi::OnSocket", "events: " + std::to_string(events));
+
+  // Check comment on node_libcurl.cc
+  LocaleGuard localeGuard;
+  // Before version 7.20.0: If you receive CURLM_CALL_MULTI_PERFORM, this
+  // basically means that you should call curl_multi_socket_action again
+  // before you wait for more actions on libcurl's sockets.
+  // You don't have to do it immediately, but the return code means that
+  // libcurl may have more data available to return or that there may be more data
+  // to send off before it is "satisfied".
+  do {
+    code =
+        curl_multi_socket_action(ctx->multi->mh, ctx->sockfd, flags, &ctx->multi->runningHandles);
+  } while (code == CURLM_CALL_MULTI_PERFORM);
+
+  assert(code == CURLM_OK && "curl_multi_socket_action failed");
+
+  // When notifications are enabled, libcurl will call our NotifyCallback when needed
+  if (!ctx->multi->useNotificationsApi) {
+    ctx->multi->ProcessMessages();
+  }
+}
 
 }  // namespace NodeLibcurl

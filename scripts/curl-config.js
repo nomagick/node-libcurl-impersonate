@@ -22,7 +22,7 @@ if (!argv[2]) {
 const arg = argv[2].trim()
 
 exec(
-  `${resolve(__dirname, '../deps/curl-impersonate/build/curl-impersonate/bin/curl-impersonate-config')} ${arg}`,
+  `sh ${resolve(__dirname, '../deps/curl-impersonate/build/deps/build/curl/curl-config')} ${arg}`,
   function (error, stdout, stderr) {
     if (error != null) {
       console.error(

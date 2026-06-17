@@ -13,10 +13,7 @@ import path from 'path'
 type httpMethod = 'POST' | 'GET' | 'PUT' | 'DELETE'
 const curlDir =
   process.env['NODE_LIBCURL_JA3_BIN_PATH'] ||
-  path.resolve(
-    __dirname,
-    '../../deps/curl-impersonate/build/curl-impersonate/bin',
-  )
+  path.resolve(__dirname, '../../deps/curl-impersonate/build/install/bin')
 
 interface CurlResponse {
   StatusCode: number

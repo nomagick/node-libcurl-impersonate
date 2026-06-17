@@ -6,7 +6,6 @@
  */
 #pragma once
 
-#include "CurlPoller.h"
 #include "macros.h"
 
 #include <curl/curl.h>
@@ -15,7 +14,7 @@
 #include <map>
 #include <memory>
 #include <napi.h>
-#include <unordered_map>
+#include <uv.h>
 
 namespace NodeLibcurl {
 
@@ -54,15 +53,23 @@ class Multi : public Napi::ObjectWrap<Multi> {
   int runningHandles = 0;
 
  private:
+  // Context for socket operations
+  struct CurlSocketContext {
+    uv_poll_t pollHandle;
+    curl_socket_t sockfd;
+    Multi* multi;
+  };
+
   // Private methods
   void StopTimer();
+  void CloseTimerAsync();
   void Dispose();
   void ProcessMessages();
   void CallOnMessageCallback(CURL* easy, CURLcode statusCode);
 
-  // Callback handlers for CurlPoller (called on main thread via TSFN)
-  void OnSocketEvent(curl_socket_t sockfd, int events);
-  void OnTimeoutEvent();
+  // Socket context helpers
+  static CurlSocketContext* CreateCurlSocketContext(curl_socket_t sockfd, Multi* multi) noexcept;
+  static void DestroyCurlSocketContext(CurlSocketContext* ctx);
 
   // Callback management
   typedef std::map<CURLMoption, Napi::FunctionReference> CallbacksMap;
@@ -72,16 +79,13 @@ class Multi : public Napi::ObjectWrap<Multi> {
   // Promise-based perform tracking
   std::map<CURL*, std::shared_ptr<Napi::Promise::Deferred>> handlePromiseMap;
 
-  // Easy handle references - prevents GC while handles are in the multi
-  std::unordered_map<CURL*, Napi::ObjectReference> easyHandleRefs;
-
-  // CurlPoller for socket polling (replaces libuv)
-  std::unique_ptr<CurlPoller> poller_;
-
-  // Timer state
+  // Timer for timeout handling
+  uv_timer_t timeout;
   bool timerClosed = false;
   napi_async_cleanup_hook_handle removeHandle;
   uint64_t id;
+
+  std::map<curl_socket_t, CurlSocketContext*> socketContextMap;
 
   // Notification API support (libcurl >= 8.17.0)
   bool useNotificationsApi = false;
@@ -95,13 +99,18 @@ class Multi : public Napi::ObjectWrap<Multi> {
   static int CbPushFunction(CURL* parent, CURL* child, size_t numberOfHeaders,
                             struct curl_pushheaders* headers, void* userPtr);
 
-  // Cleanup hooks
+  // libuv event callbacks
+  static void OnTimeout(uv_timer_t* timer);
+  static void OnSocket(uv_poll_t* handle, int status, int events);
+  static void CleanupHook(void* data);
   static void CleanupHookAsync(napi_async_cleanup_hook_handle handle, void* data);
 
 #if NODE_LIBCURL_VER_GE(8, 17, 0)
   // libcurl notification callback (available since 8.17.0)
   static void NotifyCallback(CURLM* multi, unsigned int notification, CURL* easy, void* notifyp);
 #endif
+
+  // Debug logging removed - now using NODE_LIBCURL_DEBUG_LOG macros
 
   // Prevent copying
   Multi(const Multi& that) = delete;

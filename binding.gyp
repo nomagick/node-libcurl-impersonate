@@ -36,7 +36,6 @@
         'src/CurlError.cc',
         'src/CurlVersionInfo.cc',
         'src/Http2PushFrameHeaders.cc',
-        'src/CurlPoller.cc',
       ],
       'include_dirs': [
         '<!@(node -p "require(\'node-addon-api\').include")',

@@ -6,7 +6,6 @@
  */
 #pragma once
 
-#include "ThreadUtils.h"
 #include "macros.h"
 
 #include <curl/curl.h>
@@ -16,7 +15,7 @@
 #include <map>
 #include <memory>
 #include <napi.h>
-#include <thread>
+#include <uv.h>
 #include <vector>
 
 namespace NodeLibcurl {
@@ -93,9 +92,6 @@ class Easy : public Napi::ObjectWrap<Easy> {
   void UnmonitorSockets();
   void inline throwErrorMultiInterfaceAware(const Napi::Error& error) noexcept;
 
-  // Socket monitoring thread function
-  void SocketMonitorThreadFunc();
-
   size_t OnData(char* data, size_t size, size_t nmemb);
   size_t OnHeader(char* data, size_t size, size_t nmemb);
 
@@ -105,14 +101,9 @@ class Easy : public Napi::ObjectWrap<Easy> {
   Napi::FunctionReference cbOnSocketEvent;
   std::shared_ptr<Napi::AsyncContext> cbOnSocketEventAsyncContext;
 
-  // Members for socket monitoring (replaces libuv uv_poll_t)
-  std::unique_ptr<SocketPoller> socketPoller_;
-  std::thread socketMonitorThread_;
-  std::atomic<bool> isMonitoringSockets{false};
-  std::atomic<bool> stopMonitoring_{false};
-
-  // ThreadSafeFunction for socket event callbacks
-  Napi::ThreadSafeFunction socketEventTsfn_;
+  // Members for socket monitoring
+  uv_poll_t* socketPollHandle = nullptr;
+  bool isMonitoringSockets = false;
 
   // Members for progress callback
   bool isCbProgressAlreadyAborted = false;
@@ -151,6 +142,10 @@ class Easy : public Napi::ObjectWrap<Easy> {
   static int CbTrailer(struct curl_slist** headerList, void* userdata);
   static size_t CbInterleave(void* ptr, size_t size, size_t nmemb, void* userdata);
   static int CbSshHostKey(void* clientp, int keytype, const char* key, size_t keylen);
+
+  // libuv callbacks
+  static void OnSocket(uv_poll_t* handle, int status, int events);
+  static void OnSocketClose(uv_handle_t* handle);
 
   // Helper methods
   template <typename TResultType, typename Tv8MappingType>

@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 
+## [5.1.4]
+
+### Breaking Change
+
+### Fixed
+- install script permission
+
 ## [5.1.3] - 2026-06-17
 
 ### Changed

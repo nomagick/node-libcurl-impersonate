@@ -38,7 +38,7 @@ configure_build() {
   fi
 
   if [ "$OS" = "Linux" ]; then
-   $MAKE build prepare-libidn2 BUILD_DIR="$BUILD_DIR"
+   $MAKE prepare-libidn2 BUILD_DIR="$BUILD_DIR"
   fi
 
   $MAKE configure BUILD_DIR="$BUILD_DIR" CMAKE_CONFIGURE_ARGS="$cmake_args"

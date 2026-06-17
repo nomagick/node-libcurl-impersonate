@@ -72,6 +72,8 @@ main() {
   echo "Building Curl Impersonate..."
   build_curl_impersonate
 
+  rm -f "$BUILD_DIR/deps/install/lib/"*.dylib 2>/dev/null || true
+  rm -f "$BUILD_DIR/deps/install/lib/"*.so.* 2>/dev/null || true
   echo "Build process completed successfully!"
 }
 

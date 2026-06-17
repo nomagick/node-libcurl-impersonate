@@ -1,6 +1,6 @@
 {
   "name": "@nomagick/node-libcurl-impersonate",
-  "version": "5.0.4",
+  "version": "5.1.2",
   "description": "The fastest http(s) client (and much more) for Node.js - Node.js bindings for libcurl",
   "keywords": [
     "node-curl",
@@ -60,6 +60,7 @@
     "prettier:all": "pnpm prettier lib/**/*.ts tools/**/*.js scripts/**/*.js test/**/*.ts examples/**/*.js",
     "test": "vitest run --testTimeout=60000",
     "test:coverage": "pnpm test -- --coverage.enabled=true",
+    "test:stress": "vitest run --config vitest.stress.config.ts",
     "test:watch": "vitest --testTimeout=60000",
     "preversion": "pnpm lint && pnpm clean:dist && pnpm build:dist"
   },
@@ -77,10 +78,10 @@
     ]
   },
   "dependencies": {
-    "@mapbox/node-pre-gyp": "2.0.0",
+    "@mapbox/node-pre-gyp": "2.0.3",
     "env-paths": "2.2.0",
     "node-addon-api": "8.5.0",
-    "node-gyp": "11.4.2",
+    "node-gyp": "12.3.0",
     "npmlog": "7.0.1",
     "rimraf": "5.0.5",
     "tslib": "2.6.2"

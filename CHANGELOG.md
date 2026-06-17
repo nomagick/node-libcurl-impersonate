@@ -14,16 +14,40 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 
-## [5.0.4] - 2026-05-14
+## [5.1.2] - 2026-06-08
 
-### Refactored
-- Bump libcurl-impersonate to latest
+### Fixed
+- Fixed Windows source builds against Node.js 26 failing with `LINK : fatal error LNK1117: syntax error in option 'opt:lldltojobs=2'`. Node 26 was built with clang-cl + lld + ThinLTO (PR [nodejs/node#63114](https://github.com/nodejs/node/pull/63114), released in v26.3.0), and node-gyp's `create-config-gypi.js` seeds the addon's `config.gypi` from `process.config` of the running Node binary — picking up `enable_thin_lto: true` and `lto_jobs: <n>` from how Node itself was built. Node's installed `common.gypi` then unconditionally appends `-flto=thin` to MSVC `cl.exe`'s `AdditionalOptions` and `/opt:lldltojobs=<n>` to `link.exe`'s. MSVC ignores `-flto=thin` (warning) but rejects `/opt:lldltojobs=<n>` because `/OPT:` only accepts `REF/ICF/NOREF/NOICF/LBR/NOLBR`. Force them off via `npm_config_enable_thin_lto=false` + `npm_config_enable_lto=false` in the Windows build script, which node-gyp forwards as `-Denable_thin_lto=false` gyp defines (top precedence — `binding.gyp` `variables` don't override `config.gypi`'s, they're a separate gyp scope).
 
-## [5.0.3] - 2026-02-06
+## [5.1.1] - 2026-06-05
 
-### Refactored
-- Forked and refactored to use latest node-libcurl napi bindings
-- Removed libuv dependency so this might work in more environments
+### Fixed
+- Fixed Windows source builds linking against `libidn2` (and its `libunistring` transitive dep) instead of using the Windows-native WinIDN backed by `Normaliz.lib`. The vcpkg manifest was requesting both the `idn` and `idn2` curl features, which forced vcpkg's curl port to pull libidn2 in; only `idn` is needed and lets the port pick WinIDN on Windows. Smaller binary, fewer transitive deps.
+- Fixed Windows source builds failing in deeply-nested consumer paths (typical of pnpm v10 monorepos) with `CreateProcessW failed with 206 (The filename or extension is too long)`. vcpkg's bundled `pwsh.exe` sits at `vcpkg/downloads/tools/powershell-core-<ver>-windows/pwsh.exe` — easy to push past Windows' MAX_PATH from inside a deep `node_modules/.pnpm/` tree. vcpkg's clone now goes to `%LOCALAPPDATA%\node-libcurl-vcpkg\<moduleRootHash>\` regardless of where the package lives, so the toolchain's internal paths stay short.
+- Fixed Windows source builds failing with `pkg-config: 'libcrypto'/'zlib' not found` while building libssh2 in nested consumer paths. `vcpkg_installed` was also being written inside the deep module root, and msys2 pkg-config's `PKG_CONFIG_PATH` parsing tripped over both the path length and the drive-letter colon. `vcpkg_installed` now goes to `%LOCALAPPDATA%\node-libcurl-vcpkg\<hash>-installed` via `--x-install-root`, and `vcpkg-get-info.js` resolves against that path so `binding.gyp` still finds the libs.
+- Fixed `vcpkg.exe`'s git clone failing with `Filename too long` while writing pack `.keep` files on deep paths. The clone now passes `git -c core.longpaths=true`.
+- Propagate `VCPKG_DISABLE_METRICS=1` to all vcpkg subprocess invocations from `scripts/vcpkg-setup.js` (it was being set in the env action but lost when the install script spawned `vcpkg.exe`).
+
+### Changed
+- A consumer install of node-libcurl under pnpm v10 now requires opting node-libcurl's lifecycle scripts in via `pnpm.onlyBuiltDependencies: ["node-libcurl"]` in the consumer's `package.json` (or `pnpm add --allow-build=node-libcurl`). pnpm v10's default scripts-off policy otherwise leaves the package installed but non-functional — no vcpkg setup, no native addon build. This isn't a node-libcurl change per se, but is now exercised by the new `windows-consumer-install` CI workflow so the regression-protected path is documented.
+
+## [5.1.0] - 2026-05-31
+
+### Fixed
+- Fixed `Curl.perform()` intermittently throwing `CurlMultiError: Could not remove easy handle from multi handle.: API function called from within callback` (CURLM_RECURSIVE_API_CALL) under concurrent load, particularly visible on Alpine. The regression came from v5.0.0 enabling libcurl 8.17's new `CURLMOPT_NOTIFYFUNCTION` API, which fires from inside `curl_multi_socket_action`. The notification resolved the perform-promise synchronously, and the resulting `.then()` microtask called `curl_multi_remove_handle` while libcurl was still on its own call stack. The removal is now deferred via `setImmediate` so libcurl can unwind first. (fixes [#439](https://github.com/JCMais/node-libcurl/issues/439))
+- Fixed macOS x64 prebuilt binary tarballs containing an arm64 binary instead of x86_64. The universal build packaging in `scripts/ci/build.sh` was extracting both architectures to the same output file before either was packaged, so the second `lipo` extraction overwrote the first. This affected all macOS releases since v5.0.0. ([#446](https://github.com/JCMais/node-libcurl/pull/446), fixes [#445](https://github.com/JCMais/node-libcurl/issues/445))
+- Fixed `CurlMimePart#setDataStream` hanging on Linux when libcurl needed a second read callback after the stream emitted its initial data. The mime read callback wasn't tracking `CURLPAUSE_SEND` state after returning `CURL_READFUNC_PAUSE`, so `isPausedSend` stayed `false` and the test/example unpause callbacks were silent no-ops. The unpause is now also deferred via `setImmediate` to avoid re-entering libcurl while it's still processing the pause. ([#448](https://github.com/JCMais/node-libcurl/pull/448))
+- Fixed vcpkg build failures when the exact OpenSSL version bundled with Node.js isn't present in the vcpkg registry. The build now resolves to the closest compatible version (preferring a newer patch on the same minor line, falling back to the closest lower patch, then the next minor) with a clear warning about the substitution. ([#447](https://github.com/JCMais/node-libcurl/pull/447))
+- Fixed Alpine CI builds failing with `fatal error: ngtcp2/ngtcp2_crypto_quictls.h: No such file or directory` after the ngtcp2 1.17.0 + OpenSSL 3.5+ combination switched to the new `libngtcp2_crypto_ossl` backend. Added the statically-built OpenSSL's pkgconfig dir to `PKG_CONFIG_PATH` so libcurl's probe for `libngtcp2_crypto_ossl` can resolve its `Requires: libcrypto` on systems without system OpenSSL.
+- Fixed Windows CI builds failing with `Could not find any Visual Studio installation to use` after GitHub started serving Visual Studio 2026 (v145) on the `windows-2025` runner ahead of the official 2026-06-15 migration. The build script no longer pins `msvs_version=2022`, letting node-gyp 12.1.0+ auto-detect whichever supported MSVC toolset is installed.
+
+### Added
+- Node.js 26 to the CI matrix. Prebuilt binaries are now published for Node 26 alongside the existing 22, 24, and 25 versions.
+
+### Changed
+- Bumped node-gyp from 11.4.2 to 12.3.0 and `@mapbox/node-pre-gyp` from 2.0.0 to 2.0.3. node-gyp v12.1.0+ adds Visual Studio 2026 detection support. The only node-gyp v12 breaking change (engine range bumped to `^20.17.0 || >=22.9.0`) does not affect this project, which already requires Node.js ≥ 22.20.0.
+- Bumped Alpine container image from `alpine3.21` to `alpine3.22` so the Node.js 26 image variant is available (`node:26-alpine3.21` is not published). Musl is `1.2.5` across Alpine 3.20–3.23, so the prebuilt binary remains runtime-compatible on Alpine 3.21.
+- The `unpause` callback documentation and examples for `CurlMimePart#setDataStream` and `Easy#setMimePost` now correctly reference `CurlPause.Send` instead of `CurlPause.Recv`. Mime upload data is supplied via the read callback, so pausing affects `CURLPAUSE_SEND`. ([#448](https://github.com/JCMais/node-libcurl/pull/448))
 
 ## [5.0.2] - 2026-01-15
 
@@ -523,7 +547,10 @@ Special Thanks to [@koskokos2](https://github.com/koskokos2) for their contribut
 - Improved code style, started using prettier
 ## [1.2.0] - 2017-08-28
 
-[Unreleased]: https://github.com/JCMais/node-libcurl/compare/v5.0.2...HEAD
+[Unreleased]: https://github.com/JCMais/node-libcurl/compare/v5.1.2...HEAD
+[5.1.2]: https://github.com/JCMais/node-libcurl/compare/v5.1.1...v5.1.2
+[5.1.1]: https://github.com/JCMais/node-libcurl/compare/v5.1.0...v5.1.1
+[5.1.0]: https://github.com/JCMais/node-libcurl/compare/v5.0.2...v5.1.0
 [5.0.2]: https://github.com/JCMais/node-libcurl/compare/v5.0.1...v5.0.2
 [5.0.1]: https://github.com/JCMais/node-libcurl/compare/v5.0.0...v5.0.1
 [5.0.0]: https://github.com/JCMais/node-libcurl/compare/v4.1.0...v5.0.0

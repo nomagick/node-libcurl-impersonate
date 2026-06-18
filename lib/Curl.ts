@@ -1102,7 +1102,11 @@ class Curl extends EventEmitter {
 
       writeFunctionStream.on('resume', () => {
         if (handle.isRunning) {
-          handle.pause(handle.handle.pauseFlags & ~CurlPause.Recv)
+          try {
+            handle.pause(handle.handle.pauseFlags & ~CurlPause.Recv)
+          } catch (err: unknown) {
+            writeFunctionStream.emit('error', err)
+          }
         }
       })
 

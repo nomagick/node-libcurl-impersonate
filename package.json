@@ -1,6 +1,6 @@
 {
   "name": "@nomagick/node-libcurl-impersonate",
-  "version": "5.1.6",
+  "version": "5.1.7",
   "description": "The fastest http(s) client (and much more) for Node.js - Node.js bindings for libcurl",
   "keywords": [
     "node-curl",

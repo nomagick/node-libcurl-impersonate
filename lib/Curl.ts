@@ -1110,7 +1110,7 @@ class Curl extends EventEmitter {
           try {
             handle.pause(handle.handle.pauseFlags & ~CurlPause.Recv)
           } catch (err: unknown) {
-            writeFunctionStream.emit('error', err)
+            writeFunctionStream.destroy(err as Error)
           }
         }
       })

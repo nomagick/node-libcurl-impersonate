@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 
+## [5.1.7]
+
+### Fixed
+- try catch stream resume handle to avoid creating uncaught exception
+  
 ## [5.1.6]
 
 ### Fixed

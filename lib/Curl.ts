@@ -281,7 +281,12 @@ class Curl extends EventEmitter {
    * @protected
    */
   onError(error: Error, errorCode: CurlCode) {
-    this.resetInternalState()
+    try {
+      this.resetInternalState()
+    } catch {
+      // ignore subsequent errors caused by the first error, as the main error is the one being emitted.
+      void 0
+    }
 
     this.emit('error', error, errorCode, this)
   }

@@ -223,6 +223,127 @@ const run = async () => {
           'curl-impersonate: Do not reuse TLS sessions or connections from different proxy credentials.',
         url: 'https://github.com/lexiforest/curl-impersonate/blob/2447279b1a388ba907f4bfe4fe02aadd1dc24376/patches/curl.patch#L191',
       },
+      {
+        constantOriginal: 'CURLOPT_SPLIT_COOKIES',
+        constantName: 'SPLIT_COOKIES',
+        constantNameCamelCase: 'splitCookies',
+        description:
+          'curl-impersonate: Split cookies into separate header lines.',
+        url: 'https://github.com/lexiforest/curl-impersonate/blob/8e674f96ebae13cdc97b488abb45283e99bd3571/patches/curl.patch#L895',
+      },
+      {
+        constantOriginal: 'CURLOPT_FORM_BOUNDARY',
+        constantName: 'FORM_BOUNDARY',
+        constantNameCamelCase: 'formBoundary',
+        description:
+          'curl-impersonate: Set the form boundary string for HTTP POST requests.',
+        url: 'https://github.com/lexiforest/curl-impersonate/blob/8e674f96ebae13cdc97b488abb45283e99bd3571/patches/curl.patch#L898',
+      },
+      {
+        constantOriginal: 'CURLOPT_HTTP3_PSEUDO_HEADERS_ORDER',
+        constantName: 'HTTP3_PSEUDO_HEADERS_ORDER',
+        constantNameCamelCase: 'http3PseudoHeadersOrder',
+        description:
+          'curl-impersonate: Set the order of the HTTP/3 pseudo headers. ' +
+          "The value must contain the letters 'm', 'a', 's', 'p' " +
+          'representing the pseudo-headers ":method", ":authority", ":scheme", ":path" ' +
+          'in the desired order of appearance in the HTTP/3 HEADERS frame.',
+        url: 'https://github.com/lexiforest/curl-impersonate/blob/8e674f96ebae13cdc97b488abb45283e99bd3571/patches/curl.patch#L909',
+      },
+      {
+        constantOriginal: 'CURLOPT_HTTP3_SETTINGS',
+        constantName: 'HTTP3_SETTINGS',
+        constantNameCamelCase: 'http3Settings',
+        description:
+          'curl-impersonate: HTTP3 settings frame keys and values, format: 1:v;6:v;7:v',
+        url: 'https://github.com/lexiforest/curl-impersonate/blob/8e674f96ebae13cdc97b488abb45283e99bd3571/patches/curl.patch#L912',
+      },
+      {
+        constantOriginal: 'CURLOPT_QUIC_TRANSPORT_PARAMETERS',
+        constantName: 'QUIC_TRANSPORT_PARAMETERS',
+        constantNameCamelCase: 'quicTransportParameters',
+        description:
+          'curl-impersonate: QUIC transport parameters, format: id:value;id:value',
+        url: 'https://github.com/lexiforest/curl-impersonate/blob/8e674f96ebae13cdc97b488abb45283e99bd3571/patches/curl.patch#L915',
+      },
+      {
+        constantOriginal: 'CURLOPT_HTTP3_SIG_HASH_ALGS',
+        constantName: 'HTTP3_SIG_HASH_ALGS',
+        constantNameCamelCase: 'http3SigHashAlgs',
+        description:
+          'curl-impersonate: Signature hash algorithms for HTTP/3 (QUIC TLS).',
+        url: 'https://github.com/lexiforest/curl-impersonate/blob/8e674f96ebae13cdc97b488abb45283e99bd3571/patches/curl.patch#L920',
+      },
+      {
+        constantOriginal: 'CURLOPT_HTTP3_TLS_EXTENSION_ORDER',
+        constantName: 'HTTP3_TLS_EXTENSION_ORDER',
+        constantNameCamelCase: 'http3TlsExtensionOrder',
+        description:
+          'curl-impersonate: TLS extension order for HTTP/3 (QUIC TLS).',
+        url: 'https://github.com/lexiforest/curl-impersonate/blob/8e674f96ebae13cdc97b488abb45283e99bd3571/patches/curl.patch#L924',
+      },
+      {
+        constantOriginal: 'CURLOPT_HTTPHEADER_ORDER',
+        constantName: 'HTTPHEADER_ORDER',
+        constantNameCamelCase: 'httpheaderOrder',
+        description:
+          'curl-impersonate: Comma-separated order for normal HTTP headers.',
+        url: 'https://github.com/lexiforest/curl-impersonate/blob/8e674f96ebae13cdc97b488abb45283e99bd3571/patches/curl.patch#L927',
+      },
+      {
+        constantOriginal: 'CURLOPT_HTTP3_HTTPHEADER',
+        constantName: 'HTTP3_HTTPHEADER',
+        constantNameCamelCase: 'http3Httpheader',
+        description: 'curl-impersonate: HTTP/3-specific custom HTTP headers.',
+        url: 'https://github.com/lexiforest/curl-impersonate/blob/8e674f96ebae13cdc97b488abb45283e99bd3571/patches/curl.patch#L931',
+      },
+      {
+        constantOriginal: 'CURLOPT_HTTP3_HTTPHEADER_ORDER',
+        constantName: 'HTTP3_HTTPHEADER_ORDER',
+        constantNameCamelCase: 'http3HttpheaderOrder',
+        description:
+          'curl-impersonate: HTTP/3-specific order for normal HTTP headers.',
+        url: 'https://github.com/lexiforest/curl-impersonate/blob/8e674f96ebae13cdc97b488abb45283e99bd3571/patches/curl.patch#L934',
+      },
+      {
+        constantOriginal: 'CURLOPT_HTTP3_SSL_EC_CURVES',
+        constantName: 'HTTP3_SSL_EC_CURVES',
+        constantNameCamelCase: 'http3SslEcCurves',
+        description: 'curl-impersonate: HTTP/3-specific EC curves.',
+        url: 'https://github.com/lexiforest/curl-impersonate/blob/8e674f96ebae13cdc97b488abb45283e99bd3571/patches/curl.patch#L937',
+      },
+      {
+        constantOriginal: 'CURLOPT_WS_HTTPHEADER',
+        constantName: 'WS_HTTPHEADER',
+        constantNameCamelCase: 'wsHttpheader',
+        description:
+          'curl-impersonate: WebSocket-specific custom HTTP headers.',
+        url: 'https://github.com/lexiforest/curl-impersonate/blob/8e674f96ebae13cdc97b488abb45283e99bd3571/patches/curl.patch#L941',
+      },
+      {
+        constantOriginal: 'CURLOPT_WS_HTTPHEADER_ORDER',
+        constantName: 'WS_HTTPHEADER_ORDER',
+        constantNameCamelCase: 'wsHttpheaderOrder',
+        description:
+          'curl-impersonate: WebSocket-specific order for custom HTTP headers.',
+        url: 'https://github.com/lexiforest/curl-impersonate/blob/8e674f96ebae13cdc97b488abb45283e99bd3571/patches/curl.patch#L944',
+      },
+      {
+        constantOriginal: 'CURLOPT_WS_SSL_DISABLE_TICKET',
+        constantName: 'WS_SSL_DISABLE_TICKET',
+        constantNameCamelCase: 'wsSslDisableTicket',
+        description:
+          'curl-impersonate: Disable WebSocket TLS session ticket extension.',
+        url: 'https://github.com/lexiforest/curl-impersonate/blob/8e674f96ebae13cdc97b488abb45283e99bd3571/patches/curl.patch#L947',
+      },
+      {
+        constantOriginal: 'CURLOPT_WS_SSL_CERT_COMPRESSION',
+        constantName: 'WS_SSL_CERT_COMPRESSION',
+        constantNameCamelCase: 'wsSslCertCompression',
+        description:
+          'curl-impersonate: WebSocket-specific TLS certificate compression.',
+        url: 'https://github.com/lexiforest/curl-impersonate/blob/8e674f96ebae13cdc97b488abb45283e99bd3571/patches/curl.patch#L950',
+      },
     ],
   )
 
@@ -280,6 +401,27 @@ const run = async () => {
       'REDIRECT',
     ],
   })
+  allowedCurlInfos.push(
+    ...[
+      {
+        constantOriginal: 'CURLINFO_COOKIECHANGES',
+        constantName: 'COOKIECHANGES',
+        constantNameCamelCase: 'cookieChanges',
+        description:
+          'curl-impersonate: accepted server cookie mutations from the latest transfer, ' +
+          'formatted as SET/DELETE plus Netscape cookie fields. Use a high number to avoid collisions with upstream infos.',
+        url: 'https://github.com/lexiforest/curl-impersonate/blob/8e674f96ebae13cdc97b488abb45283e99bd3571/patches/curl.patch#L963',
+      },
+      {
+        constantOriginal: 'CURLINFO_REDIRECT_HISTORY',
+        constantName: 'REDIRECT_HISTORY',
+        constantNameCamelCase: 'redirectHistory',
+        description:
+          'curl-impersonate: followed HTTP redirect responses from the latest transfer, formatted as status-code plus tab plus request URL.',
+        url: 'https://github.com/lexiforest/curl-impersonate/blob/8e674f96ebae13cdc97b488abb45283e99bd3571/patches/curl.patch#L967',
+      },
+    ],
+  )
   await createConstantsFile({
     constants: allowedCurlInfos,
     variableName: 'CurlInfo',

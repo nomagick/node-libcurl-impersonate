@@ -322,16 +322,6 @@ export interface CurlyFunction extends HttpMethodCalls {
    * @param limit - Number of Curl instances to keep in the pool. 0 disables pooling.
    */
   setObjectPoolLimit: (limit: number) => void
-
-  /**
-   * **EXPERIMENTAL** This API can change between minor releases
-   *
-   * This returns a new `curly` with the specified impersonation options set by default.
-   */
-  impersonate: (
-    browserOrImpersonateConfig: Browser | ImpersonateConfig,
-    defaultOptions?: CurlyOptions,
-  ) => CurlyFunction
 }
 
 const create = (defaultOptions: CurlyOptions = {}): CurlyFunction => {
@@ -694,36 +684,11 @@ If you want just a single function to handle all content-types, you can use the 
  */
 export const curly = create()
 
-import {
-  type Browser,
-  type ImpersonateConfig,
-  getCurlOptionsFromBrowser,
-  getCurlOptionsFromBrowserConfig,
-} from './impersonate'
 import { CurlInfo } from './generated/CurlInfo'
 
 export type CurlyGetInfoReturn = Partial<
   Record<keyof CurlInfo, string[] | string | number>
 >
-
-export function impersonate(
-  browserOrImpersonateConfig: Browser | ImpersonateConfig,
-  defaultOptions: CurlyOptions = {},
-): CurlyFunction {
-  let options: CurlyOptions
-  if (typeof browserOrImpersonateConfig === 'string') {
-    options = {
-      ...defaultOptions,
-      ...getCurlOptionsFromBrowser(browserOrImpersonateConfig),
-    }
-  } else {
-    options = {
-      ...defaultOptions,
-      ...getCurlOptionsFromBrowserConfig(browserOrImpersonateConfig),
-    }
-  }
-  return create(options)
-}
 
 export function getInfo(curlHandle: Curl): CurlyGetInfoReturn {
   const info: CurlyGetInfoReturn = {}

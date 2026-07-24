@@ -32,8 +32,6 @@ export {
   type CurlyResponseBodyParser,
 } from './curly'
 
-export * from './impersonate'
-
 // errors
 export * from './CurlError'
 export * from './CurlEasyError'

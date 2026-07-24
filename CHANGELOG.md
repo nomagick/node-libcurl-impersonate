@@ -14,6 +14,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 
+## [5.2.0]
+
+### Breaking Change
+- Removed the JS-level impersonation wrapper: `Curl.impersonate()`, `curly`'s `impersonate` method, the standalone `impersonate()` function, and the entire `./impersonate` module export (`Browser`, `ImpersonateConfig`, `getCurlOptionsFromBrowser`, `getCurlOptionsFromBrowserConfig`, JA3 fingerprint helpers, and the `CurlJa3Cipher`/`CurlJa3Curve`/`CurlJa3Extension`/`CurlJa3SigHashAlg` enums). curl-impersonate now exposes its browser-fingerprinting knobs natively as regular options (e.g. `HTTPHEADER_ORDER`, `HTTP3_PSEUDO_HEADERS_ORDER`, `FORM_BOUNDARY`), generated straight from the bumped `curl-impersonate` submodule — set them directly via `Curl.setOpt()` instead of the removed wrapper.
+
+### Fixed
+
+### Added
+
+### Changed
+
 ## [5.1.7]
 
 ### Fixed

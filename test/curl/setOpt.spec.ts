@@ -203,7 +203,7 @@ describe('setOpt()', () => {
 
   describe.runIf(Curl.isVersionGreaterOrEqualThan(7, 71, 0))('BLOB', () => {
     it('should be able to set blob value back to null', () => {
-      curl.setOpt('SSLKEY_BLOB', Buffer.from([]))
+      curl.setOpt('SSLKEY_BLOB', Buffer.from([0]))
       curl.setOpt('SSLKEY_BLOB', null)
     })
 

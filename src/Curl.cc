@@ -132,6 +132,10 @@ const std::vector<CurlConstant> curlOptionInteger = {
     {"DOH_SSL_VERIFYSTATUS", CURLOPT_DOH_SSL_VERIFYSTATUS},
 #endif
 
+#if NODE_LIBCURL_VER_GE(7, 46, 0)
+    {"STREAM_WEIGHT", CURLOPT_STREAM_WEIGHT},
+#endif
+
 #if NODE_LIBCURL_VER_GE(7, 36, 0)
     {"EXPECT_100_TIMEOUT_MS", CURLOPT_EXPECT_100_TIMEOUT_MS},
 #endif
@@ -450,7 +454,7 @@ const std::vector<CurlConstant> curlOptionNotImplemented = {
 #if NODE_LIBCURL_VER_GE(7, 46, 0)
     {"STREAM_DEPENDS", CURLOPT_STREAM_DEPENDS},
     {"STREAM_DEPENDS_E", CURLOPT_STREAM_DEPENDS_E},
-    {"STREAM_WEIGHT", CURLOPT_STREAM_WEIGHT},
+// {"STREAM_WEIGHT", CURLOPT_STREAM_WEIGHT},
 #endif
 };
 

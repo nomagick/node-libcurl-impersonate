@@ -1083,7 +1083,7 @@ class Curl extends EventEmitter {
             }
           }
 
-          cb(null)
+          cb(error)
         },
         read(size) {
           handle.streamPendingReadSize += size

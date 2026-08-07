@@ -259,6 +259,14 @@ const run = async () => {
         url: 'https://github.com/lexiforest/curl-impersonate/blob/8e674f96ebae13cdc97b488abb45283e99bd3571/patches/curl.patch#L912',
       },
       {
+        constantOriginal: 'CURLOPT_QUIC_CID_LENGTH',
+        constantName: 'QUIC_CID_LENGTH',
+        constantNameCamelCase: 'quicCidLength',
+        description:
+          'curl-impersonate: Sets the browser profile used to choose the initial QUIC destination and source connection ID lengths.',
+        url: 'https://github.com/lexiforest/curl-impersonate/blob/ddf2c1a44fa991315d9ffbc7154bb196e143726d/patches/curl.patch#L952',
+      },
+      {
         constantOriginal: 'CURLOPT_QUIC_TRANSPORT_PARAMETERS',
         constantName: 'QUIC_TRANSPORT_PARAMETERS',
         constantNameCamelCase: 'quicTransportParameters',

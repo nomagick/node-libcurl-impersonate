@@ -1083,6 +1083,13 @@ class Curl extends EventEmitter {
             }
           }
 
+          // Only forward `error` here, never a synthesized one: Node's own
+          // Readable.destroy() contract says destroy() with no error is a
+          // deliberate, non-error close (just 'close', no 'error'), while
+          // destroy(err) reports that exact err. `handle.streamError` above
+          // still carries a synthetic message so libcurl gets aborted, but
+          // that's an internal detail - it must not leak out as a stream
+          // 'error' the caller never asked for.
           cb(error)
         },
         read(size) {

@@ -381,7 +381,7 @@ describe('streams', () => {
       expect(error.code).toBe(CurlCode.CURLE_ABORTED_BY_CALLBACK)
     })
 
-    it('emits an error when the download stream is destroyed unexpectedly', async () => {
+    it('does not emit an error when the download stream is destroyed without one', async () => {
       const { statusCode, data: downloadStream } = await curly.get<Readable>(
         `${serverInstance.url}/all?type=json`,
         withCommonTestOptions({
@@ -404,17 +404,20 @@ describe('streams', () => {
           )
         })
 
-        downloadStream.on('error', (error: CurlEasyError) => {
-          try {
-            expect(error).toBeInstanceOf(CurlEasyError)
-            expect(error.cause).toMatchInlineSnapshot(
-              `[Error: Curl response stream was unexpectedly destroyed]`,
-            )
-            expect(error.code).toBe(CurlCode.CURLE_ABORTED_BY_CALLBACK)
-            resolve(undefined)
-          } catch (error) {
-            reject(error)
-          }
+        // Per Node's Readable.destroy() contract, destroy() with no error is
+        // a deliberate, non-error close: it must only emit 'close', never
+        // 'error'. Only destroy(err) should result in an 'error' event - see
+        // the next test.
+        downloadStream.on('error', (error: Error) => {
+          reject(
+            new Error(
+              `Stream should not have emitted an error, but got: ${error}`,
+            ),
+          )
+        })
+
+        downloadStream.on('close', () => {
+          resolve(undefined)
         })
       })
     })
@@ -448,11 +451,13 @@ describe('streams', () => {
           )
         })
 
-        downloadStream.on('error', (error: CurlEasyError) => {
+        // When the caller destroys the stream with their own error, Node's
+        // Readable.destroy(err) contract emits that exact error object on
+        // 'error' right away - it is not (and should not be) wrapped into a
+        // CurlEasyError, since the error never actually came from curl/libcurl.
+        downloadStream.on('error', (error: Error) => {
           try {
-            expect(error).toBeInstanceOf(CurlEasyError)
-            expect(error.cause).toBe(errorObject)
-            expect(error.code).toBe(CurlCode.CURLE_ABORTED_BY_CALLBACK)
+            expect(error).toBe(errorObject)
 
             resolve(undefined)
           } catch (error) {

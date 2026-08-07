@@ -586,15 +586,10 @@ const create = (defaultOptions: CurlyOptions = {}): CurlyFunction => {
             ? error
             : new CurlEasyError(error.message, errorCode, { cause: error })
 
-        // oops, if have a stream it means the promise
-        // has been resolved with it
-        // so instead of rejecting the original promise
-        // we are emitting the error event on the stream
         if (stream) {
-          stream.emit('error', errorToUse)
-        } else {
-          reject(errorToUse)
+          stream.destroy(errorToUse)
         }
+        reject(errorToUse)
       })
 
       try {

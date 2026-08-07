@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 
 ### Added
+### Changed
+
+## [5.2.1]
+
+### Breaking Change
+
+### Fixed
+- curl stream unexpectedly swallowing errors
+- bump curl-impersonate to latest
+
+### Added
+- `QUIC_CID_LENGTH`, from the curl-impersonate bump
 
 ### Changed
 

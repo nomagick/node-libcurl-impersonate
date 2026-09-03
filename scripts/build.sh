@@ -38,7 +38,7 @@ configure_build() {
   fi
 
   if [ "$OS" = "Linux" ]; then
-   $MAKE prepare-libidn2 BUILD_DIR="$BUILD_DIR" LIBIDN2_VERSION="2.3.7" LIBIDN2_URL="https://ftp.fau.de/gnu/libidn/libidn2-2.3.7.tar.gz"
+   $MAKE prepare-libidn2 BUILD_DIR="$BUILD_DIR"
   fi
 
   $MAKE configure BUILD_DIR="$BUILD_DIR" CMAKE_CONFIGURE_ARGS="$cmake_args"

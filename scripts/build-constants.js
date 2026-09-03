@@ -352,6 +352,22 @@ const run = async () => {
           'curl-impersonate: WebSocket-specific TLS certificate compression.',
         url: 'https://github.com/lexiforest/curl-impersonate/blob/8e674f96ebae13cdc97b488abb45283e99bd3571/patches/curl.patch#L950',
       },
+      {
+        constantOriginal: 'CURLOPT_HTTP3_SSL_PERMUTE_EXTENSIONS',
+        constantName: 'HTTP3_SSL_PERMUTE_EXTENSIONS',
+        constantNameCamelCase: 'http3SslPermuteExtensions',
+        description:
+          'HTTP/3-specific BoringSSL extension permutation. -1 inherits CURLOPT_SSL_PERMUTE_EXTENSIONS, 0 disables, 1 enables.',
+        url: 'https://github.com/lexiforest/curl-impersonate/blob/a389715b26d064dfcf32b18b7a1d3eb753995a76/patches/curl.patch#L988-L990',
+      },
+      {
+        constantOriginal: 'CURLOPT_TLS_TRUST_ANCHORS',
+        constantName: 'TLS_TRUST_ANCHORS',
+        constantNameCamelCase: 'tlsTrustAnchors',
+        description:
+          'curl-impersonate: Comma-separated TLS trust anchor relative OIDs. ',
+        url: 'https://github.com/lexiforest/curl-impersonate/blob/a389715b26d064dfcf32b18b7a1d3eb753995a76/patches/curl.patch#L992-L993',
+      },
     ],
   )
 

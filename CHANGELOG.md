@@ -11,7 +11,22 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 
 ### Added
+
 ### Changed
+
+## [5.2.2] - 2026-09-03
+
+### Breaking Change
+
+### Fixed
+
+### Added
+- `HTTP3_SSL_PERMUTE_EXTENSIONS`, from the curl-impersonate bump - HTTP/3-specific BoringSSL extension permutation (`-1` inherits `SSL_PERMUTE_EXTENSIONS`, `0` disables, `1` enables)
+- `TLS_TRUST_ANCHORS`, from the curl-impersonate bump - comma-separated TLS trust anchor relative OIDs
+
+### Changed
+- Bumped curl-impersonate to v2.2.2 (was v2.1.1)
+- Linux source builds download libidn2 from `ftp.gnu.org` again instead of the `ftp.fau.de` mirror. The `LIBIDN2_VERSION`/`LIBIDN2_URL` override added to `scripts/build.sh` while ftp.gnu.org was unreachable has been reverted, so the curl-impersonate submodule's own defaults apply (still libidn2 2.3.7).
 
 ## [5.2.1]
 
@@ -597,7 +612,8 @@ Special Thanks to [@koskokos2](https://github.com/koskokos2) for their contribut
 - Improved code style, started using prettier
 ## [1.2.0] - 2017-08-28
 
-[Unreleased]: https://github.com/JCMais/node-libcurl/compare/v5.1.2...HEAD
+[Unreleased]: https://github.com/nomagick/node-libcurl-impersonate/compare/v5.2.2...HEAD
+[5.2.2]: https://github.com/nomagick/node-libcurl-impersonate/compare/v5.2.1...v5.2.2
 [5.1.2]: https://github.com/JCMais/node-libcurl/compare/v5.1.1...v5.1.2
 [5.1.1]: https://github.com/JCMais/node-libcurl/compare/v5.1.0...v5.1.1
 [5.1.0]: https://github.com/JCMais/node-libcurl/compare/v5.0.2...v5.1.0

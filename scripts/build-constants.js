@@ -368,6 +368,16 @@ const run = async () => {
           'curl-impersonate: Comma-separated TLS trust anchor relative OIDs. ',
         url: 'https://github.com/lexiforest/curl-impersonate/blob/a389715b26d064dfcf32b18b7a1d3eb753995a76/patches/curl.patch#L992-L993',
       },
+      {
+        constantOriginal: 'CURLOPT_QUIC_INITIAL_PACKET_NUMBER',
+        constantName: 'QUIC_INITIAL_PACKET_NUMBER',
+        constantNameCamelCase: 'quicInitialPacketNumber',
+        description:
+          'curl-impersonate: QUIC initial packet number. ' +
+          '-1 selects the Firefox randomized distribution; ' +
+          'non-negative values select a fixed number.',
+        url: 'https://github.com/lexiforest/curl-impersonate/blob/6e8f87760a4dd96771e96fc9d55440dcd8845243/patches/curl.patch#L1001-L1003',
+      },
     ],
   )
 

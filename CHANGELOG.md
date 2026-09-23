@@ -14,6 +14,18 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 
+## [5.2.3] - 2026-09-23
+
+### Breaking Change
+
+### Fixed
+
+### Added
+- `QUIC_INITIAL_PACKET_NUMBER`, from the curl-impersonate bump - QUIC initial packet number (`-1` selects the Firefox randomized distribution, non-negative values select a fixed number)
+
+### Changed
+- Bumped curl-impersonate to v2.2.3 (was v2.2.2), which merges curl 8.22.0 and adds c-ares as a dependency
+
 ## [5.2.2] - 2026-09-03
 
 ### Breaking Change
@@ -612,7 +624,8 @@ Special Thanks to [@koskokos2](https://github.com/koskokos2) for their contribut
 - Improved code style, started using prettier
 ## [1.2.0] - 2017-08-28
 
-[Unreleased]: https://github.com/nomagick/node-libcurl-impersonate/compare/v5.2.2...HEAD
+[Unreleased]: https://github.com/nomagick/node-libcurl-impersonate/compare/v5.2.3...HEAD
+[5.2.3]: https://github.com/nomagick/node-libcurl-impersonate/compare/v5.2.2...v5.2.3
 [5.2.2]: https://github.com/nomagick/node-libcurl-impersonate/compare/v5.2.1...v5.2.2
 [5.1.2]: https://github.com/JCMais/node-libcurl/compare/v5.1.1...v5.1.2
 [5.1.1]: https://github.com/JCMais/node-libcurl/compare/v5.1.0...v5.1.1

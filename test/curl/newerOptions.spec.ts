@@ -22,6 +22,10 @@ import { withCommonTestOptions } from '../helper/commonOptions'
 
 let serverInstance: ReturnType<typeof createServer>
 
+// SSH options are only known to libcurl when it was built with an SSH backend
+// (curl-impersonate builds don't have one).
+const hasSsh = Curl.getVersionInfo().protocols.includes('scp')
+
 describe('options from newer libcurl versions', () => {
   beforeAll(async () => {
     serverInstance = createServer()
@@ -47,12 +51,14 @@ describe('options from newer libcurl versions', () => {
           expect(easy.setOpt('ALTSVC', '/tmp/altsvc-cache.txt')).toBe(
             CurlCode.CURLE_OK,
           )
-          expect(
-            easy.setOpt(
-              'SSH_HOST_PUBLIC_KEY_SHA256',
-              'NDVkMTQxMGQ4NTk3ZmY0YjVjMjI5OTc4NWMyY2RmMjE=',
-            ),
-          ).toBe(CurlCode.CURLE_OK)
+          if (hasSsh) {
+            expect(
+              easy.setOpt(
+                'SSH_HOST_PUBLIC_KEY_SHA256',
+                'NDVkMTQxMGQ4NTk3ZmY0YjVjMjI5OTc4NWMyY2RmMjE=',
+              ),
+            ).toBe(CurlCode.CURLE_OK)
+          }
         } finally {
           easy.close()
         }
@@ -112,7 +118,7 @@ describe('options from newer libcurl versions', () => {
         }
       })
 
-      it('accepts SSH_HOSTKEYFUNCTION', () => {
+      it.runIf(hasSsh)('accepts SSH_HOSTKEYFUNCTION', () => {
         const easy = new Easy()
         try {
           expect(easy.setOpt('SSH_HOSTKEYFUNCTION', () => 0)).toBe(

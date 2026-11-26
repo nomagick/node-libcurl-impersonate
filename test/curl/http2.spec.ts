@@ -93,11 +93,17 @@ describe('HTTP2', () => {
     expect(result).toBe(200)
   })
 
-  it.runIf(Curl.isVersionGreaterOrEqualThan(8, 4, 0)).each([
-    { accept: true, decision: 'accept' },
-    { accept: false, decision: 'deny' },
-    { accept: false, decision: 'throw while handling' },
-  ])(
+  // curl-impersonate sends browser-like HTTP/2 SETTINGS, which disable server push.
+  it
+    .runIf(
+      Curl.isVersionGreaterOrEqualThan(8, 4, 0) &&
+        !Curl.getVersionInfo().version.includes('IMPERSONATE'),
+    )
+    .each([
+      { accept: true, decision: 'accept' },
+      { accept: false, decision: 'deny' },
+      { accept: false, decision: 'throw while handling' },
+    ])(
     'can $decision an HTTP/2 push',
     async ({ accept, decision }) => {
       const multi = new Multi()

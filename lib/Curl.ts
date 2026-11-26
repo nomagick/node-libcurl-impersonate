@@ -228,7 +228,7 @@ class Curl extends EventEmitter {
   // common
   protected streamPauseNext = false
   protected streamContinueNext = false
-  protected streamError: false | Error = false
+  protected streamError?: Error
   protected streamUserSuppliedProgressFunction: CurlOptionValueType['xferInfoFunction'] =
     null
   protected nextPauseFlags: CurlPause | null = null
@@ -282,7 +282,6 @@ class Curl extends EventEmitter {
    * @protected
    */
   onError(error: Error, errorCode: CurlCode) {
-    const streamError = this.streamError
     try {
       this.resetInternalState()
     } catch {
@@ -290,7 +289,7 @@ class Curl extends EventEmitter {
       void 0
     }
 
-    this.emit('error', streamError || error, errorCode, this)
+    this.emit('error', error ?? this.streamError, errorCode, this)
   }
 
   /**
@@ -1038,7 +1037,7 @@ class Curl extends EventEmitter {
     this.streamPendingReadSize = 0
     this.nextPauseFlags = null
     this.streamContinueNext = false
-    this.streamError = false
+    this.streamError = undefined
     this.streamUserSuppliedProgressFunction = null
 
     this.cleanupReadFunctionStreamEvents()
@@ -1245,7 +1244,7 @@ class Curl extends EventEmitter {
         // error path - a direct emit would produce two 'error' events for
         // the same request (and crash the process when the first handler
         // removed all listeners, like the curly object pool does)
-        this.streamError = new Error('Could not get status code of request')
+        this.streamError ??= new Error('Could not get status code of request')
         return -1
       }
 

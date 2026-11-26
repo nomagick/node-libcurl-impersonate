@@ -11,10 +11,26 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 
 ### Added
+
+### Changed
+
+## [5.2.4] - 2026-11-26
+
+### Breaking Change
+
+### Fixed
+- Building from source on macOS with a recent Xcode (macOS 27 SDK) produced a binding that failed to load with `symbol not found in flat namespace '___isPlatformVersionAtLeast'`. The macOS static link now includes clang's compiler runtime, which `-static` was leaving out.
+
+### Added
 - [`SOCKOPTFUNCTION`](https://curl.se/libcurl/c/CURLOPT_SOCKOPTFUNCTION.html) option. The callback is called as `(fd, purpose, address)`, where `address` is the `{ family, address, port }` the socket is about to connect to, so it can be used to block connections to private/internal addresses (SSRF), including ones reached through redirects or DNS rebinding. Return `CurlSockOpt.Error` to abort the connection with `CURLE_ABORTED_BY_CALLBACK`. New `CurlSockOpt` and `CurlSockType` enums and the `CurlSockAddr` type are exported. Note that the callback only runs when a new socket is opened: reused connections from the connection cache do not trigger it.
 
 ### Changed
-- Bumped curl-impersonate to v2.3.2+ (`4fd3c5b`, was `94908bd`; curl stays at 8.23.0). It brings zlib 1.4, cookies sent in browser order (longer paths first, then oldest first), empty HTTP/3 settings strings now allowed, and a backported fix for TLS errors with HTTPS-RR
+- Bumped curl-impersonate to v2.3.2+ (`4fd3c5b`, was v2.2.3), which merges curl 8.23.0 (was 8.22.0) and bumps zlib to 1.4, brotli to 1.2.1 and c-ares to 1.34.9. Notable behavior changes:
+  - Cookies are now sent in browser order: longer paths first, then older cookies first.
+  - HTTPS record DNS lookups no longer bypass proxy DNS.
+  - Websocket `permessage-deflate` support.
+  - Empty HTTP/3 settings strings are accepted.
+  - Backported fix for TLS error propagation with HTTPS-RR.
 
 ## [5.2.3] - 2026-09-23
 
@@ -626,7 +642,8 @@ Special Thanks to [@koskokos2](https://github.com/koskokos2) for their contribut
 - Improved code style, started using prettier
 ## [1.2.0] - 2017-08-28
 
-[Unreleased]: https://github.com/nomagick/node-libcurl-impersonate/compare/v5.2.3...HEAD
+[Unreleased]: https://github.com/nomagick/node-libcurl-impersonate/compare/v5.2.4...HEAD
+[5.2.4]: https://github.com/nomagick/node-libcurl-impersonate/compare/v5.2.3...v5.2.4
 [5.2.3]: https://github.com/nomagick/node-libcurl-impersonate/compare/v5.2.2...v5.2.3
 [5.2.2]: https://github.com/nomagick/node-libcurl-impersonate/compare/v5.2.1...v5.2.2
 [5.1.2]: https://github.com/JCMais/node-libcurl/compare/v5.1.1...v5.1.2

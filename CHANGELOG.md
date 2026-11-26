@@ -13,16 +13,18 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 
 ### Changed
-- Rebased onto upstream [node-libcurl v5.2.0](https://github.com/JCMais/node-libcurl/releases/tag/v5.2.0). See the `[upstream 5.2.0]` section below for the changes it brings in.
 
-## [upstream 5.2.0] - 2026-11-25
+## [5.2.5] - 2026-11-26
+
+### Breaking Change
 
 ### Fixed
+The following fixes come from upstream node-libcurl v5.2.0:
 - Release the Multi wrapper after `Multi#close()` so it can be collected. ([#457](https://github.com/JCMais/node-libcurl/pull/457), fixes [#453](https://github.com/JCMais/node-libcurl/issues/453))
 - HTTP/2 push header accessors throw after the push callback returns. ([#460](https://github.com/JCMais/node-libcurl/pull/460), fixes [#452](https://github.com/JCMais/node-libcurl/issues/452))
 - `Multi#perform()` now rejects if its transfer is removed or its Multi is closed. Multi keeps attached Easy handles alive, detaches them during shutdown, and releases their socket watchers. Transfers added without `onMessage` can complete safely, and Multi stops polling sockets when libcurl requests no events. ([#464](https://github.com/JCMais/node-libcurl/pull/464))
 - `Curl#close()` now cancels active transfers on their owning Multi, including transfers using `setMulti()`. Closing from a transfer callback defers cleanup until libcurl returns. ([#464](https://github.com/JCMais/node-libcurl/pull/464))
-- Restored HTTP/2 server push callbacks on libcurl 8.4 and later. Accepted pushes are tracked by the Multi, and denied pushes close the offered Easy handle. ([#464](https://github.com/JCMais/node-libcurl/pull/464))
+- Restored HTTP/2 server push callbacks on libcurl 8.4 and later. Accepted pushes are tracked by the Multi, and denied pushes close the offered Easy handle. Note that curl-impersonate sends browser-like HTTP/2 SETTINGS that disable server push, so servers will not push unless those settings are overridden. ([#464](https://github.com/JCMais/node-libcurl/pull/464))
 - `READFUNCTION` receives a zero-filled buffer and validates the returned byte count. Upload seeks preserve offsets beyond 4 GiB, and file uploads advance by the number of bytes actually read. ([#463](https://github.com/JCMais/node-libcurl/pull/463))
 - Callback errors are retained until delivery, and reused Easy handles start with fresh transfer-local progress and HSTS state. `HSTSREADFUNCTION` preserves hostnames at the maximum supported length. ([#463](https://github.com/JCMais/node-libcurl/pull/463))
 - Easy handles keep their Share alive while attached. `Share#close()` reports `CURLSHE_IN_USE` while the Share is attached, and automatic Easy cleanup skips callbacks whose JavaScript receiver has been collected. ([#463](https://github.com/JCMais/node-libcurl/pull/463))
@@ -34,17 +36,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Fixed `Curl.getCount()` and fixed `Curl#dupHandle()` to preserve the user agent and copy `stream` listeners. ([#462](https://github.com/JCMais/node-libcurl/pull/462))
 - Fixed the numeric `TELNETOPTIONS` mapping and enabled native dispatch for existing bindings including `ABSTRACT_UNIX_SOCKET`, `ALTSVC`, `ALTSVC_CTRL`, `FTPSSLAUTH`, `FTP_SSL_CCC`, `MIME_OPTIONS`, `PROXY_ISSUERCERT_BLOB`, `SSH_HOSTKEYFUNCTION`, `SSH_HOST_PUBLIC_KEY_SHA256`, `TFTP_NO_OPTIONS`, `WS_OPTIONS`, and `INTERLEAVEFUNCTION`. ([#461](https://github.com/JCMais/node-libcurl/pull/461))
 - Corrected `CurlSshKeyType` numeric values to match libcurl. `CurlMultiNetworkChanged.ClearConns` and `.ClearDns` clear their respective caches on libcurl 8.20 and later, while both retain the combined behavior on libcurl 8.16–8.19. ([#461](https://github.com/JCMais/node-libcurl/pull/461))
-- Updated bundled Brotli to 1.2.1 on all platforms to fix [CVE-2026-111497](https://www.cve.org/CVERecord?id=CVE-2026-111497), an out-of-bounds write in the decoder. ([#456](https://github.com/JCMais/node-libcurl/issues/456))
 - Fixed `end` (and the promise returned by `Multi#perform`) not being delivered on Node.js 26 until some other JavaScript callback ran, which made requests awaited one at a time take ~1s each (libcurl's multi timer period) or never complete in an otherwise idle process. `Multi::OnSocket` and `Multi::OnTimeout` called into JavaScript from libuv without a callback scope, so the microtask queue was not drained afterwards. Before Node.js 26.4.0 an unrelated drain in `CheckImmediate` hid this ([nodejs/node#62969](https://github.com/nodejs/node/pull/62969)). Both now open a `Napi::CallbackScope`. As a side effect, `process.nextTick` callbacks and microtasks queued from inside data, header, progress, and other easy callbacks now run once the libuv callback that dispatched them returns, instead of after each individual callback. This matches how Node.js core runs callbacks. ([#455](https://github.com/JCMais/node-libcurl/pull/455), fixes [#454](https://github.com/JCMais/node-libcurl/issues/454))
 - Fixed the process aborting with `Assertion failed: (code == CURLM_OK), function Dispose` when `Multi#close` is called from inside `onMessage` on libcurl >= 8.17 (where the notifications API is the default, as in `examples/04-multi.js`), or from inside an easy callback such as `WRITEFUNCTION` with any libcurl version. libcurl rejects `curl_multi_cleanup` with `CURLM_RECURSIVE_API_CALL` while it is running its own callbacks, so the cleanup is now deferred until `curl_multi_socket_action` returns.
-- Fixed building from source on Windows with Visual Studio 2026 (MSBuild 18) when node-libcurl is installed in a deeply nested folder, such as a pnpm store inside a monorepo. The build failed with `PathTooLongException` in `WriteLinesToFile` because gyp generated a project for node-addon-api's header-only `node_addon_api_except` target next to node-addon-api's own folder, and MSBuild wrote its intermediate files there. On Windows its settings are now set directly in `binding.gyp`.
 
 ### Added
+From upstream node-libcurl v5.2.0:
 - Added `Curl.info.SIZE_DELIVERED` and the `QUICK_EXIT` and `RESOLVE_THREADS_MAX` Multi options on libcurl 8.20 and later. ([#461](https://github.com/JCMais/node-libcurl/pull/461))
 - Added `CurlAltSvc` and the enum members `CurlFileType.Unknown`, `CurlMultiNetworkChanged.ClearAll`, `CurlSshKeyType.Rsa1`, `CurlSshKeyMatch.Missing`, `CurlVersion.Hsts`, and `CurlVersion.ThreadSafe`. ([#461](https://github.com/JCMais/node-libcurl/pull/461))
 
 ### Changed
-- The security policy supports v5 and describes when a fix may be offered for the previous major version. ([#459](https://github.com/JCMais/node-libcurl/pull/459))
+- Rebased onto upstream [node-libcurl v5.2.0](https://github.com/JCMais/node-libcurl/releases/tag/v5.2.0) (was v5.1.2). The fixes and additions above come from that release. curl-impersonate stays at v2.3.2+ (`4fd3c5b`, curl 8.23.0).
 
 ## [5.2.4] - 2026-11-26
 
@@ -674,11 +675,11 @@ Special Thanks to [@koskokos2](https://github.com/koskokos2) for their contribut
 - Improved code style, started using prettier
 ## [1.2.0] - 2017-08-28
 
-[Unreleased]: https://github.com/nomagick/node-libcurl-impersonate/compare/v5.2.4...HEAD
+[Unreleased]: https://github.com/nomagick/node-libcurl-impersonate/compare/v5.2.5...HEAD
+[5.2.5]: https://github.com/nomagick/node-libcurl-impersonate/compare/v5.2.4...v5.2.5
 [5.2.4]: https://github.com/nomagick/node-libcurl-impersonate/compare/v5.2.3...v5.2.4
 [5.2.3]: https://github.com/nomagick/node-libcurl-impersonate/compare/v5.2.2...v5.2.3
 [5.2.2]: https://github.com/nomagick/node-libcurl-impersonate/compare/v5.2.1...v5.2.2
-[upstream 5.2.0]: https://github.com/JCMais/node-libcurl/compare/v5.1.2...v5.2.0
 [5.1.2]: https://github.com/JCMais/node-libcurl/compare/v5.1.1...v5.1.2
 [5.1.1]: https://github.com/JCMais/node-libcurl/compare/v5.1.0...v5.1.1
 [5.1.0]: https://github.com/JCMais/node-libcurl/compare/v5.0.2...v5.1.0

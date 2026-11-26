@@ -211,9 +211,11 @@
               ],
             }]
           ],
+          'defines': ['BUILD_IMPERSONATE'],
         }],
         ['OS=="mac"', {
           'cflags+': ['-fvisibility=hidden'],
+          'defines': ['BUILD_IMPERSONATE'],
           'configurations': {
             'Debug': {
               'xcode_settings': {
@@ -242,13 +244,12 @@
               ],
               'xcode_settings': {
                 'OTHER_LDFLAGS': [
-                  # HACK: -framework CoreFoundation appears twice, but CoreFoundation is a singleton
-                  # because it doesn't start with a -. We need to remove one of the instances of
-                  # -framework CoreFoundation or GYP will break our args.
-                  # This seems to be required starting with xcode 12
-                  # original workaround from https://github.com/JCMais/node-libcurl/pull/312
                   '-static',
-                  '<!@(<(curl_config_bin) --static-libs | sed "s/-framework CoreFoundation -framework CoreServices -framework/-framework/g" | sed "s/-framework CoreFoundation//")',
+                  '<!@(<(curl_config_bin) --static-libs)',
+                  # -static stops clang from linking its own runtime (compiler-rt), but libcurl
+                  # needs it for __builtin_available() (___isPlatformVersionAtLeast) when built
+                  # against a macOS SDK newer than the deployment target.
+                  '<!(xcrun clang -print-resource-dir)/lib/darwin/libclang_rt.osx.a',
                 ],
 
                 'LD_RUNPATH_SEARCH_PATHS': [

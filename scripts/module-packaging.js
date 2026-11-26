@@ -35,7 +35,7 @@ const octo = new Octokit({
   auth: process.env['NODE_LIBCURL_GITHUB_TOKEN'],
 })
 
-const [owner, repo] = 'JCMais/node-libcurl'.split('/')
+const [owner, repo] = 'nomagick/node-libcurl-impersonate'.split('/')
 const commands = {
   publish: publish,
   unpublish: unpublish,

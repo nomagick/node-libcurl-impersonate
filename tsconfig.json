@@ -17,6 +17,7 @@
     "strict": true,
     "allowSyntheticDefaultImports": true,
     "typeRoots": ["node_modules/@types", "types/external"],
+    "types": ["node"],
     "noUnusedLocals": true,
     "importHelpers": true,
     "skipLibCheck": true

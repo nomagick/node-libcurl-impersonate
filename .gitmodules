@@ -1,4 +1,7 @@
 [submodule "vcpkg"]
-	path   = vcpkg
+	path   = deps/vcpkg
 	ignore = dirty
 	url 	 = https://github.com/microsoft/vcpkg.git
+[submodule "deps/curl-impersonate"]
+	path = deps/curl-impersonate
+	url = https://github.com/lexiforest/curl-impersonate.git

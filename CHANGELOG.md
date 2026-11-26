@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 
 ### Added
+- [`SOCKOPTFUNCTION`](https://curl.se/libcurl/c/CURLOPT_SOCKOPTFUNCTION.html) option. The callback is called as `(fd, purpose, address)`, where `address` is the `{ family, address, port }` the socket is about to connect to, so it can be used to block connections to private/internal addresses (SSRF), including ones reached through redirects or DNS rebinding. Return `CurlSockOpt.Error` to abort the connection with `CURLE_ABORTED_BY_CALLBACK`. New `CurlSockOpt` and `CurlSockType` enums and the `CurlSockAddr` type are exported. Note that the callback only runs when a new socket is opened: reused connections from the connection cache do not trigger it.
 
 ### Changed
 

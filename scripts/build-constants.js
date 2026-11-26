@@ -408,6 +408,7 @@ const run = async () => {
       import { CurlProtocol } from '../enum/CurlProtocol'
       import { CurlProxy } from '../enum/CurlProxy'
       import { CurlRtspRequest } from '../enum/CurlRtspRequest'
+      import { CurlSockAddr, CurlSockOpt, CurlSockType } from '../enum/CurlSockOpt'
       import { CurlSshAuth } from '../enum/CurlSshAuth'
       import { CurlSshKeyType, CurlSshKeyMatch } from '../enum/CurlSshKey'
       import { CurlSslOpt } from '../enum/CurlSslOpt'

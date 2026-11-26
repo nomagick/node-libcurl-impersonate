@@ -33,6 +33,7 @@ const optionKindMap = {
     'INTERLEAVEFUNCTION',
     'PREREQFUNCTION',
     'SEEKFUNCTION',
+    'SOCKOPTFUNCTION',
     'SSH_HOSTKEYFUNCTION',
     'TRAILERFUNCTION',
     'SHARE',
@@ -90,6 +91,8 @@ const optionKindValueMap = {
     '((this: Easy, data: Buffer, size: number, nmemb: number) => number)',
   PREREQFUNCTION:
     '((this: Easy, connPrimaryIp: string, connLocalIp: string, connPrimaryPort: number, conLocalPort: number) => CurlPreReqFunc)',
+  SOCKOPTFUNCTION:
+    '((this: Easy, fd: number, purpose: CurlSockType, address: CurlSockAddr | undefined) => CurlSockOpt)',
   SSH_HOSTKEYFUNCTION:
     '((this: Easy, keytype: CurlSshKeyType, key: Buffer) => CurlSshKeyMatch)',
   HTTPPOST: 'HttpPostField[]',

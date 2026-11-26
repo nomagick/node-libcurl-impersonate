@@ -55,6 +55,7 @@ import { CurlProgressFunc } from './enum/CurlProgressFunc'
 import { CurlProtocol } from './enum/CurlProtocol'
 import { CurlProxy } from './enum/CurlProxy'
 import { CurlRtspRequest } from './enum/CurlRtspRequest'
+import { CurlSockAddr, CurlSockOpt, CurlSockType } from './enum/CurlSockOpt'
 import { CurlSshAuth } from './enum/CurlSshAuth'
 import { CurlSshKeyType, CurlSshKeyMatch } from './enum/CurlSshKey'
 import { CurlSslOpt } from './enum/CurlSslOpt'
@@ -1456,6 +1457,23 @@ interface Curl {
   setOpt(
     option: 'SEEKFUNCTION',
     value: ((this: Easy, offset: number, origin: number) => number) | null,
+  ): this
+  /**
+   * Use {@link Curl.option|`Curl.option`} for predefined constants.
+   *
+   *
+   * Official libcurl documentation: [`curl_easy_setopt()`](http://curl.haxx.se/libcurl/c/curl_easy_setopt.html)
+   */
+  setOpt(
+    option: 'SOCKOPTFUNCTION',
+    value:
+      | ((
+          this: Easy,
+          fd: number,
+          purpose: CurlSockType,
+          address: CurlSockAddr | undefined,
+        ) => CurlSockOpt)
+      | null,
   ): this
   /**
    * Use {@link Curl.option|`Curl.option`} for predefined constants.

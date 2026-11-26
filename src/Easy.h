@@ -115,6 +115,13 @@ class Easy : public Napi::ObjectWrap<Easy> {
   // Memory management
   std::shared_ptr<ToFree> toFree = nullptr;
 
+  // SOCKOPTFUNCTION support: destination address of the last socket created by CbOpenSocket.
+  // libcurl calls the sockopt callback right after opening the socket (before connect),
+  // so this lets us tell the JS callback where the socket is about to connect to.
+  curl_socket_t lastOpenedSocket = CURL_SOCKET_BAD;
+  struct sockaddr_storage lastOpenedSocketAddr = {};
+  size_t lastOpenedSocketAddrLen = 0;
+
   // HSTS cache
   std::vector<Napi::Reference<Napi::Object>> hstsReadCache;
   bool wasHstsReadCacheSet = false;
@@ -140,6 +147,9 @@ class Easy : public Napi::ObjectWrap<Easy> {
   static int CbPreReq(void* clientp, char* conn_primary_ip, char* conn_local_ip,
                       int conn_primary_port, int conn_local_port);
   static int CbTrailer(struct curl_slist** headerList, void* userdata);
+  static curl_socket_t CbOpenSocket(void* clientp, curlsocktype purpose,
+                                    struct curl_sockaddr* address);
+  static int CbSockOpt(void* clientp, curl_socket_t curlfd, curlsocktype purpose);
   static size_t CbInterleave(void* ptr, size_t size, size_t nmemb, void* userdata);
   static int CbSshHostKey(void* clientp, int keytype, const char* key, size_t keylen);
 

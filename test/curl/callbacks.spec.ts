@@ -5,7 +5,16 @@
  * LICENSE file in the root directory of this source tree.
  */
 import { createServer } from '../helper/server'
-import { Curl, CurlCode, CurlEasyError, CurlPreReqFunc } from '../../lib'
+import {
+  Curl,
+  CurlCode,
+  CurlEasyError,
+  CurlPreReqFunc,
+  CurlSockAddr,
+  CurlSockOpt,
+  CurlSockType,
+  Easy,
+} from '../../lib'
 import {
   describe,
   beforeAll,
@@ -449,4 +458,140 @@ describe('Callbacks', () => {
       })
     },
   )
+  describe('sockopt', function () {
+    // The callback is only called when a new socket is created, make sure
+    // a connection from a previous test is not reused.
+    beforeEach(() => {
+      curl.setOpt('FRESH_CONNECT', true)
+    })
+
+    const performAndWait = () =>
+      new Promise<{ error?: CurlEasyError; errorCode?: CurlCode }>(
+        (resolve) => {
+          curl.on('end', () => resolve({}))
+          curl.on('error', (error: CurlEasyError, errorCode: CurlCode) =>
+            resolve({ error, errorCode }),
+          )
+          curl.perform()
+        },
+      )
+
+    it('should be called with the fd, purpose and destination address', async () => {
+      const calls: Array<{
+        fd: number
+        purpose: CurlSockType
+        address: CurlSockAddr | undefined
+        thisArg: unknown
+      }> = []
+
+      curl.setOpt('URL', `${serverInstance.url}/headers`)
+      curl.setOpt('SOCKOPTFUNCTION', function (fd, purpose, address) {
+        calls.push({ fd, purpose, address, thisArg: this })
+        return CurlSockOpt.Ok
+      })
+
+      const { error } = await performAndWait()
+
+      expect(error).toBeUndefined()
+      expect(calls.length).toBeGreaterThanOrEqual(1)
+
+      const [call] = calls
+      expect(call.thisArg).toBeInstanceOf(Easy)
+      expect(typeof call.fd).toBe('number')
+      expect(call.purpose).toBe(CurlSockType.IpCxn)
+      expect(call.address).toBeDefined()
+      expect(['IPv4', 'IPv6']).toContain(call.address!.family)
+      expect(['127.0.0.1', '::1']).toContain(call.address!.address)
+      expect(call.address!.port).toBe(serverInstance.port)
+    })
+
+    it('should abort the connection on Error return value (SSRF fence)', async () => {
+      const isLoopback = (address?: CurlSockAddr) =>
+        !!address &&
+        (address.address.startsWith('127.') || address.address === '::1')
+
+      let wasCalled = false
+      curl.setOpt('URL', `${serverInstance.url}/headers`)
+      curl.setOpt('SOCKOPTFUNCTION', (_fd, _purpose, address) => {
+        wasCalled = true
+        return isLoopback(address) ? CurlSockOpt.Error : CurlSockOpt.Ok
+      })
+
+      const { error, errorCode } = await performAndWait()
+
+      expect(wasCalled).toBe(true)
+      expect(error).toBeInstanceOf(CurlEasyError)
+      expect(errorCode).toBe(CurlCode.CURLE_ABORTED_BY_CALLBACK)
+    })
+
+    it('should rethrow error thrown inside callback', async () => {
+      const errorObject = new Error('thrown error inside callback')
+      curl.setOpt('URL', `${serverInstance.url}/headers`)
+      curl.setOpt('SOCKOPTFUNCTION', () => {
+        throw errorObject
+      })
+
+      const { error, errorCode } = await performAndWait()
+
+      expect(error).toBeInstanceOf(CurlEasyError)
+      expect(error!.cause).toBe(errorObject)
+      expect(errorCode).toBe(CurlCode.CURLE_ABORTED_BY_CALLBACK)
+    })
+
+    it('should throw an error on invalid return value', async () => {
+      curl.setOpt('URL', `${serverInstance.url}/headers`)
+      // @ts-expect-error this should require the fn to return an enum value!
+      curl.setOpt('SOCKOPTFUNCTION', () => 'abc')
+
+      const { error, errorCode } = await performAndWait()
+
+      expect(error).toBeInstanceOf(CurlEasyError)
+      expect((error!.cause as Error).message).toBe(
+        'Return value from the SOCKOPT callback must be a number.',
+      )
+      expect(errorCode).toBe(CurlCode.CURLE_ABORTED_BY_CALLBACK)
+    })
+
+    it('should stop being called after being unset', async () => {
+      let wasCalled = false
+      curl.setOpt('URL', `${serverInstance.url}/headers`)
+      curl.setOpt('SOCKOPTFUNCTION', () => {
+        wasCalled = true
+        return CurlSockOpt.Error
+      })
+      curl.setOpt('SOCKOPTFUNCTION', null)
+
+      const { error } = await performAndWait()
+
+      expect(error).toBeUndefined()
+      expect(wasCalled).toBe(false)
+    })
+
+    it('should work with the Easy interface and duplicated handles', () => {
+      const easy = new Easy()
+      withCommonTestOptions(easy)
+      const callers: Easy[] = []
+
+      easy.setOpt('URL', `${serverInstance.url}/headers`)
+      easy.setOpt('FRESH_CONNECT', true)
+      easy.setOpt('SOCKOPTFUNCTION', function () {
+        callers.push(this)
+        return CurlSockOpt.Error
+      })
+
+      const dup = easy.dupHandle()
+
+      expect(easy.perform()).toBe(CurlCode.CURLE_ABORTED_BY_CALLBACK)
+      expect(dup.perform()).toBe(CurlCode.CURLE_ABORTED_BY_CALLBACK)
+      // localhost may resolve to more than one address, each attempt calls the callback
+      const easyCalls = callers.filter((caller) => caller === easy).length
+      const dupCalls = callers.filter((caller) => caller === dup).length
+      expect(easyCalls).toBeGreaterThanOrEqual(1)
+      expect(dupCalls).toBeGreaterThanOrEqual(1)
+      expect(easyCalls + dupCalls).toBe(callers.length)
+
+      easy.close()
+      dup.close()
+    })
+  })
 }, 5000)

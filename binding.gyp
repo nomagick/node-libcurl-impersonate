@@ -225,6 +225,10 @@
                 'OTHER_LDFLAGS': [
                   '-static',
                   '<!@(<(curl_config_bin) --static-libs)',
+                  # -static stops clang from linking its own runtime (compiler-rt), but libcurl
+                  # needs it for __builtin_available() (___isPlatformVersionAtLeast) when built
+                  # against a macOS SDK newer than the deployment target.
+                  '<!(xcrun clang -print-resource-dir)/lib/darwin/libclang_rt.osx.a',
                 ],
 
                 'LD_RUNPATH_SEARCH_PATHS': [

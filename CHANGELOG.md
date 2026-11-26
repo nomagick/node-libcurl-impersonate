@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - [`SOCKOPTFUNCTION`](https://curl.se/libcurl/c/CURLOPT_SOCKOPTFUNCTION.html) option. The callback is called as `(fd, purpose, address)`, where `address` is the `{ family, address, port }` the socket is about to connect to, so it can be used to block connections to private/internal addresses (SSRF), including ones reached through redirects or DNS rebinding. Return `CurlSockOpt.Error` to abort the connection with `CURLE_ABORTED_BY_CALLBACK`. New `CurlSockOpt` and `CurlSockType` enums and the `CurlSockAddr` type are exported. Note that the callback only runs when a new socket is opened: reused connections from the connection cache do not trigger it.
 
 ### Changed
+- Bumped curl-impersonate to v2.3.2+ (`4fd3c5b`, was `94908bd`; curl stays at 8.23.0). It brings zlib 1.4, cookies sent in browser order (longer paths first, then oldest first), empty HTTP/3 settings strings now allowed, and a backported fix for TLS errors with HTTPS-RR
 
 ## [5.2.3] - 2026-09-23
 

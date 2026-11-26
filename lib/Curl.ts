@@ -54,6 +54,7 @@ import { CurlProgressFunc } from './enum/CurlProgressFunc'
 import { CurlProtocol } from './enum/CurlProtocol'
 import { CurlProxy } from './enum/CurlProxy'
 import { CurlRtspRequest } from './enum/CurlRtspRequest'
+import { CurlSockAddr, CurlSockOpt, CurlSockType } from './enum/CurlSockOpt'
 import { CurlSshAuth } from './enum/CurlSshAuth'
 import { CurlSshKeyType, CurlSshKeyMatch } from './enum/CurlSshKey'
 import { CurlSslOpt } from './enum/CurlSslOpt'
@@ -282,7 +283,12 @@ class Curl extends EventEmitter {
    */
   onError(error: Error, errorCode: CurlCode) {
     const streamError = this.streamError
-    this.resetInternalState()
+    try {
+      this.resetInternalState()
+    } catch {
+      // ignore subsequent errors caused by the first error, as the main error is the one being emitted.
+      void 0
+    }
 
     this.emit('error', streamError || error, errorCode, this)
   }
@@ -1166,7 +1172,14 @@ class Curl extends EventEmitter {
             }
           }
 
-          cb(null)
+          // Only forward `error` here, never a synthesized one: Node's own
+          // Readable.destroy() contract says destroy() with no error is a
+          // deliberate, non-error close (just 'close', no 'error'), while
+          // destroy(err) reports that exact err. `handle.streamError` above
+          // still carries a synthetic message so libcurl gets aborted, but
+          // that's an internal detail - it must not leak out as a stream
+          // 'error' the caller never asked for.
+          cb(error)
         },
         read(size) {
           if (handle.writeFunctionStream !== writeFunctionStream) return
@@ -1209,7 +1222,11 @@ class Curl extends EventEmitter {
 
       writeFunctionStream.on('resume', () => {
         if (handle.isRunning) {
-          handle.pause(handle.handle.pauseFlags & ~CurlPause.Recv)
+          try {
+            handle.pause(handle.handle.pauseFlags & ~CurlPause.Recv)
+          } catch (err: unknown) {
+            writeFunctionStream.destroy(err as Error)
+          }
         }
       })
 
@@ -1566,6 +1583,23 @@ interface Curl {
   setOpt(
     option: 'SEEKFUNCTION',
     value: ((this: Easy, offset: number, origin: number) => number) | null,
+  ): this
+  /**
+   * Use {@link Curl.option|`Curl.option`} for predefined constants.
+   *
+   *
+   * Official libcurl documentation: [`curl_easy_setopt()`](http://curl.haxx.se/libcurl/c/curl_easy_setopt.html)
+   */
+  setOpt(
+    option: 'SOCKOPTFUNCTION',
+    value:
+      | ((
+          this: Easy,
+          fd: number,
+          purpose: CurlSockType,
+          address: CurlSockAddr | undefined,
+        ) => CurlSockOpt)
+      | null,
   ): this
   /**
    * Use {@link Curl.option|`Curl.option`} for predefined constants.

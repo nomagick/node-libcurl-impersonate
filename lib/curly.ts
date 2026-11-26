@@ -48,7 +48,7 @@ export interface CurlyResult<ResultData = any> {
 }
 
 // This is basically http.METHODS
-const methods = [
+export const methods = [
   'acl',
   'bind',
   'checkout',
@@ -612,22 +612,14 @@ const create = (defaultOptions: CurlyOptions = {}): CurlyFunction => {
             ? error
             : new CurlEasyError(error.message, errorCode, { cause: error })
 
-        // oops, if have a stream it means the promise
-        // has been resolved with it
-        // so instead of rejecting the original promise
-        // we are emitting the error event on the stream
-        //
-        // note: emit (not stream.destroy(error)) is intentional - the
-        // response stream has a custom _destroy that swallows the passed
-        // error (it is resurfaced through this very code path), so
-        // destroy(error) here would silently drop it. Per Node.js stream
-        // conventions, consumers must attach an 'error' listener (async
-        // iterators and pipeline() do this automatically).
+        // if we have a stream it means the promise has already been resolved
+        // with it, so destroy the stream with the error (the response stream's
+        // destroy() forwards the given error, emitting 'error' per Node.js
+        // stream conventions). Rejecting afterwards is a no-op in that case.
         if (stream) {
-          stream.emit('error', errorToUse)
-        } else {
-          reject(errorToUse)
+          stream.destroy(errorToUse)
         }
+        reject(errorToUse)
       })
 
       try {
@@ -716,3 +708,21 @@ If you want just a single function to handle all content-types, you can use the 
  * @public
  */
 export const curly = create()
+
+import { CurlInfo } from './generated/CurlInfo'
+
+export type CurlyGetInfoReturn = Partial<
+  Record<keyof CurlInfo, string[] | string | number>
+>
+
+export function getInfo(curlHandle: Curl): CurlyGetInfoReturn {
+  const info: CurlyGetInfoReturn = {}
+  for (const [name, id] of Object.entries(Curl.info).sort(([a], [b]) =>
+    a.localeCompare(b),
+  )) {
+    info[name as keyof CurlInfo] = curlHandle.getInfo(id)
+  }
+  return info
+}
+
+export const defaultResponseBodyParsers = curly.defaultResponseBodyParsers

@@ -24,8 +24,13 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstring>
 #include <iostream>
+
+#ifndef _WIN32
+#include <sys/un.h>
+#endif
 
 // 36055 was allocated on Win64
 #define MEMORY_PER_HANDLE 30000
@@ -237,6 +242,8 @@ void Easy::ResetRequiredHandleOptions(bool isFromDuplicate) {
 #if NODE_LIBCURL_VER_GE(7, 84, 0)
     curl_easy_setopt(this->ch, CURLOPT_SSH_HOSTKEYDATA, this);
 #endif
+    curl_easy_setopt(this->ch, CURLOPT_OPENSOCKETDATA, this);
+    curl_easy_setopt(this->ch, CURLOPT_SOCKOPTDATA, this);
   }
 
   // Set CURLOPT_CAINFO_BLOB with CA certificates from Node.js's tls module
@@ -723,7 +730,8 @@ Napi::Value Easy::SetOpt(const Napi::CallbackInfo& info) {
         throw Napi::TypeError::New(env, "Option value must be an Array.");
       }
 
-      std::unique_ptr<curl_slist, decltype(&curl_slist_free_all)> list(nullptr, curl_slist_free_all);
+      std::unique_ptr<curl_slist, decltype(&curl_slist_free_all)> list(nullptr,
+                                                                       curl_slist_free_all);
       Napi::Array array = value.As<Napi::Array>();
 
       for (uint32_t i = 0, len = array.Length(); i < len; ++i) {
@@ -982,6 +990,24 @@ Napi::Value Easy::SetOpt(const Napi::CallbackInfo& info) {
         }
         break;
 #endif
+      case CURLOPT_SOCKOPTFUNCTION:
+        // We also install our own OPENSOCKETFUNCTION, so we can record the destination address
+        // of each socket and pass it to the JS callback (the socket is not connected yet when
+        // the sockopt callback is called, so getpeername() would not work).
+        if (isNull) {
+          this->callbacks.erase(CURLOPT_SOCKOPTFUNCTION);
+          curl_easy_setopt(this->ch, CURLOPT_OPENSOCKETFUNCTION, NULL);
+          curl_easy_setopt(this->ch, CURLOPT_OPENSOCKETDATA, NULL);
+          curl_easy_setopt(this->ch, CURLOPT_SOCKOPTDATA, NULL);
+          setOptRetCode = curl_easy_setopt(this->ch, CURLOPT_SOCKOPTFUNCTION, NULL);
+        } else {
+          this->callbacks[CURLOPT_SOCKOPTFUNCTION] = Napi::Persistent(value.As<Napi::Function>());
+          curl_easy_setopt(this->ch, CURLOPT_OPENSOCKETDATA, this);
+          curl_easy_setopt(this->ch, CURLOPT_OPENSOCKETFUNCTION, Easy::CbOpenSocket);
+          curl_easy_setopt(this->ch, CURLOPT_SOCKOPTDATA, this);
+          setOptRetCode = curl_easy_setopt(this->ch, CURLOPT_SOCKOPTFUNCTION, Easy::CbSockOpt);
+        }
+        break;
       case CURLOPT_SEEKFUNCTION:
         setOptRetCode = CURLE_OK;
         if (isNull) {
@@ -1476,7 +1502,7 @@ Napi::Value Easy::WsStartFrame(const Napi::CallbackInfo& info) {
     throw CurlError::New(env, "Curl handle is closed.", CURLE_BAD_FUNCTION_ARGUMENT);
   }
 
-#if NODE_LIBCURL_VER_GE(7, 86, 0)
+#if NODE_LIBCURL_VER_GE(8, 16, 0)
   if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsNumber()) {
     throw CurlError::New(env, "Missing flags and/or frame length arguments.",
                          CURLE_BAD_FUNCTION_ARGUMENT);
@@ -2513,6 +2539,127 @@ int Easy::CbPreReq(void* clientp, char* conn_primary_ip, char* conn_local_ip, in
 #else
   return 0;
 #endif
+}
+
+curl_socket_t Easy::CbOpenSocket(void* clientp, curlsocktype purpose,
+                                 struct curl_sockaddr* address) {
+  (void)purpose;
+  Easy* obj = static_cast<Easy*>(clientp);
+  assert(obj);
+
+  // Same as what libcurl does by default when no OPENSOCKETFUNCTION is set.
+  curl_socket_t sockfd = socket(address->family, address->socktype, address->protocol);
+
+  if (sockfd != CURL_SOCKET_BAD) {
+    size_t len = std::min(static_cast<size_t>(address->addrlen), sizeof(obj->lastOpenedSocketAddr));
+    obj->lastOpenedSocket = sockfd;
+    std::memset(&obj->lastOpenedSocketAddr, 0, sizeof(obj->lastOpenedSocketAddr));
+    std::memcpy(&obj->lastOpenedSocketAddr, &address->addr, len);
+    obj->lastOpenedSocketAddrLen = len;
+  }
+
+  return sockfd;
+}
+
+// Converts a sockaddr into { family, address, port }, or undefined if the family is not supported.
+static Napi::Value SockAddrToJs(Napi::Env env, const struct sockaddr_storage* storage, size_t len) {
+  char ip[INET6_ADDRSTRLEN + 1] = {0};
+  Napi::Object result = Napi::Object::New(env);
+
+  if (storage->ss_family == AF_INET && len >= sizeof(struct sockaddr_in)) {
+    const auto* sin = reinterpret_cast<const struct sockaddr_in*>(storage);
+    uv_ip4_name(sin, ip, sizeof(ip));
+    result.Set("family", "IPv4");
+    result.Set("address", ip);
+    result.Set("port", ntohs(sin->sin_port));
+    return result;
+  }
+
+  if (storage->ss_family == AF_INET6 && len >= sizeof(struct sockaddr_in6)) {
+    const auto* sin6 = reinterpret_cast<const struct sockaddr_in6*>(storage);
+    uv_ip6_name(sin6, ip, sizeof(ip));
+    result.Set("family", "IPv6");
+    result.Set("address", ip);
+    result.Set("port", ntohs(sin6->sin6_port));
+    return result;
+  }
+
+#ifndef _WIN32
+  if (storage->ss_family == AF_UNIX) {
+    const auto* sun = reinterpret_cast<const struct sockaddr_un*>(storage);
+    size_t offset = offsetof(struct sockaddr_un, sun_path);
+    size_t pathLen = len > offset ? strnlen(sun->sun_path, len - offset) : 0;
+    result.Set("family", "unix");
+    result.Set("address", std::string(sun->sun_path, pathLen));
+    result.Set("port", 0);
+    return result;
+  }
+#endif
+
+  return env.Undefined();
+}
+
+int Easy::CbSockOpt(void* clientp, curl_socket_t curlfd, curlsocktype purpose) {
+  Easy* obj = static_cast<Easy*>(clientp);
+  assert(obj);
+
+  auto it = obj->callbacks.find(CURLOPT_SOCKOPTFUNCTION);
+  assert(it != obj->callbacks.end() && "SOCKOPTFUNCTION callback not set.");
+
+  // Figure out the address this socket is about to connect to / is connected to.
+  struct sockaddr_storage addr = {};
+  size_t addrLen = 0;
+
+  if (curlfd == obj->lastOpenedSocket) {
+    addr = obj->lastOpenedSocketAddr;
+    addrLen = obj->lastOpenedSocketAddrLen;
+  } else {
+    // Accepted sockets (FTP active mode) are already connected.
+#ifdef _WIN32
+    int peerLen = sizeof(addr);
+#else
+    socklen_t peerLen = sizeof(addr);
+#endif
+    if (getpeername(curlfd, reinterpret_cast<struct sockaddr*>(&addr), &peerLen) == 0) {
+      addrLen = static_cast<size_t>(peerLen);
+    }
+  }
+  // Socket descriptors get reused, never match a stale one.
+  obj->lastOpenedSocket = CURL_SOCKET_BAD;
+
+  try {
+    Napi::Env env = obj->Env();
+    Napi::HandleScope scope(env);
+
+    Napi::Function cb = it->second.Value();
+
+    Napi::Value jsFd = Napi::Number::New(env, static_cast<double>(curlfd));
+    Napi::Value jsPurpose = Napi::Number::New(env, static_cast<int>(purpose));
+    Napi::Value jsAddress = addrLen > 0 ? SockAddrToJs(env, &addr, addrLen) : env.Undefined();
+
+    Napi::AsyncContext asyncContext(env, "Easy::CbSockOpt");
+
+    Napi::Value result = cb.MakeCallback(obj->Value(), {jsFd, jsPurpose, jsAddress}, asyncContext);
+
+    if (env.IsExceptionPending()) {
+      Napi::Error error = env.GetAndClearPendingException();
+      obj->throwErrorMultiInterfaceAware(error);
+      return CURL_SOCKOPT_ERROR;
+    }
+
+    if (result.IsEmpty() || !result.IsNumber()) {
+      Napi::TypeError typeError =
+          Napi::TypeError::New(env, "Return value from the SOCKOPT callback must be a number.");
+      obj->throwErrorMultiInterfaceAware(typeError);
+      return CURL_SOCKOPT_ERROR;
+    }
+
+    return result.As<Napi::Number>().Int32Value();
+
+  } catch (const Napi::Error& e) {
+    obj->throwErrorMultiInterfaceAware(e);
+    return CURL_SOCKOPT_ERROR;
+  }
 }
 
 int Easy::CbTrailer(struct curl_slist** headerList, void* userdata) {

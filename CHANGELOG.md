@@ -13,8 +13,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 
 ### Changed
+- Rebased onto upstream [node-libcurl v5.2.0](https://github.com/JCMais/node-libcurl/releases/tag/v5.2.0). See the `[upstream 5.2.0]` section below for the changes it brings in.
 
-## [5.2.0] - 2026-11-25
+## [upstream 5.2.0] - 2026-11-25
 
 ### Fixed
 - Release the Multi wrapper after `Multi#close()` so it can be collected. ([#457](https://github.com/JCMais/node-libcurl/pull/457), fixes [#453](https://github.com/JCMais/node-libcurl/issues/453))
@@ -44,6 +45,101 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 - The security policy supports v5 and describes when a fix may be offered for the previous major version. ([#459](https://github.com/JCMais/node-libcurl/pull/459))
+
+## [5.2.4] - 2026-11-26
+
+### Breaking Change
+
+### Fixed
+- Building from source on macOS with a recent Xcode (macOS 27 SDK) produced a binding that failed to load with `symbol not found in flat namespace '___isPlatformVersionAtLeast'`. The macOS static link now includes clang's compiler runtime, which `-static` was leaving out.
+
+### Added
+- [`SOCKOPTFUNCTION`](https://curl.se/libcurl/c/CURLOPT_SOCKOPTFUNCTION.html) option. The callback is called as `(fd, purpose, address)`, where `address` is the `{ family, address, port }` the socket is about to connect to, so it can be used to block connections to private/internal addresses (SSRF), including ones reached through redirects or DNS rebinding. Return `CurlSockOpt.Error` to abort the connection with `CURLE_ABORTED_BY_CALLBACK`. New `CurlSockOpt` and `CurlSockType` enums and the `CurlSockAddr` type are exported. Note that the callback only runs when a new socket is opened: reused connections from the connection cache do not trigger it.
+
+### Changed
+- Bumped curl-impersonate to v2.3.2+ (`4fd3c5b`, was v2.2.3), which merges curl 8.23.0 (was 8.22.0) and bumps zlib to 1.4, brotli to 1.2.1 and c-ares to 1.34.9. Notable behavior changes:
+  - Cookies are now sent in browser order: longer paths first, then older cookies first.
+  - HTTPS record DNS lookups no longer bypass proxy DNS.
+  - Websocket `permessage-deflate` support.
+  - Empty HTTP/3 settings strings are accepted.
+  - Backported fix for TLS error propagation with HTTPS-RR.
+
+## [5.2.3] - 2026-09-23
+
+### Breaking Change
+
+### Fixed
+
+### Added
+- `QUIC_INITIAL_PACKET_NUMBER`, from the curl-impersonate bump - QUIC initial packet number (`-1` selects the Firefox randomized distribution, non-negative values select a fixed number)
+
+### Changed
+- Bumped curl-impersonate to v2.2.3 (was v2.2.2), which merges curl 8.22.0 and adds c-ares as a dependency
+
+## [5.2.2] - 2026-09-03
+
+### Breaking Change
+
+### Fixed
+
+### Added
+- `HTTP3_SSL_PERMUTE_EXTENSIONS`, from the curl-impersonate bump - HTTP/3-specific BoringSSL extension permutation (`-1` inherits `SSL_PERMUTE_EXTENSIONS`, `0` disables, `1` enables)
+- `TLS_TRUST_ANCHORS`, from the curl-impersonate bump - comma-separated TLS trust anchor relative OIDs
+
+### Changed
+- Bumped curl-impersonate to v2.2.2 (was v2.1.1)
+- Linux source builds download libidn2 from `ftp.gnu.org` again instead of the `ftp.fau.de` mirror. The `LIBIDN2_VERSION`/`LIBIDN2_URL` override added to `scripts/build.sh` while ftp.gnu.org was unreachable has been reverted, so the curl-impersonate submodule's own defaults apply (still libidn2 2.3.7).
+
+## [5.2.1]
+
+### Breaking Change
+
+### Fixed
+- curl stream unexpectedly swallowing errors
+- bump curl-impersonate to latest
+
+### Added
+- `QUIC_CID_LENGTH`, from the curl-impersonate bump
+
+### Changed
+
+## [5.2.0]
+
+### Breaking Change
+- Removed the JS-level impersonation wrapper: `Curl.impersonate()`, `curly`'s `impersonate` method, the standalone `impersonate()` function, and the entire `./impersonate` module export (`Browser`, `ImpersonateConfig`, `getCurlOptionsFromBrowser`, `getCurlOptionsFromBrowserConfig`, JA3 fingerprint helpers, and the `CurlJa3Cipher`/`CurlJa3Curve`/`CurlJa3Extension`/`CurlJa3SigHashAlg` enums). curl-impersonate now exposes its browser-fingerprinting knobs natively as regular options (e.g. `HTTPHEADER_ORDER`, `HTTP3_PSEUDO_HEADERS_ORDER`, `FORM_BOUNDARY`), generated straight from the bumped `curl-impersonate` submodule — set them directly via `Curl.setOpt()` instead of the removed wrapper.
+
+### Fixed
+
+### Added
+
+### Changed
+
+## [5.1.7]
+
+### Fixed
+- try catch stream resume handle to avoid creating uncaught exception
+  
+## [5.1.6]
+
+### Fixed
+- try catch error handler to avoid creating uncaught exception
+
+## [5.1.5]
+
+### Fixed
+- try catch stream resume handle to avoid creating uncaught exception
+
+## [5.1.4]
+
+### Breaking Change
+
+### Fixed
+- install script permission
+
+## [5.1.3] - 2026-06-17
+
+### Changed
+- Statically linked curl-impersonate
 
 ## [5.1.2] - 2026-06-08
 
@@ -578,8 +674,11 @@ Special Thanks to [@koskokos2](https://github.com/koskokos2) for their contribut
 - Improved code style, started using prettier
 ## [1.2.0] - 2017-08-28
 
-[Unreleased]: https://github.com/JCMais/node-libcurl/compare/v5.2.0...HEAD
-[5.2.0]: https://github.com/JCMais/node-libcurl/compare/v5.1.2...v5.2.0
+[Unreleased]: https://github.com/nomagick/node-libcurl-impersonate/compare/v5.2.4...HEAD
+[5.2.4]: https://github.com/nomagick/node-libcurl-impersonate/compare/v5.2.3...v5.2.4
+[5.2.3]: https://github.com/nomagick/node-libcurl-impersonate/compare/v5.2.2...v5.2.3
+[5.2.2]: https://github.com/nomagick/node-libcurl-impersonate/compare/v5.2.1...v5.2.2
+[upstream 5.2.0]: https://github.com/JCMais/node-libcurl/compare/v5.1.2...v5.2.0
 [5.1.2]: https://github.com/JCMais/node-libcurl/compare/v5.1.1...v5.1.2
 [5.1.1]: https://github.com/JCMais/node-libcurl/compare/v5.1.0...v5.1.1
 [5.1.0]: https://github.com/JCMais/node-libcurl/compare/v5.0.2...v5.1.0
